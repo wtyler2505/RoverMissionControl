@@ -503,7 +503,7 @@ class ArduinoLibraryManager:
 
 library_manager = ArduinoLibraryManager()
 
-# Database initialization
+# Enhanced Database initialization with Knowledge Base support
 def init_database():
     conn = sqlite3.connect(DATA_DIR / "rover_platform.db")
     cursor = conn.cursor()
@@ -533,15 +533,100 @@ def init_database():
         )
     ''')
     
-    # Components inventory table
+    # Enhanced Parts Categories table
     cursor.execute('''
-        CREATE TABLE IF NOT EXISTS inventory (
+        CREATE TABLE IF NOT EXISTS part_categories (
             id INTEGER PRIMARY KEY,
-            name TEXT,
-            quantity INTEGER,
-            status TEXT,
+            name TEXT UNIQUE,
+            description TEXT,
+            parent_id INTEGER,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (parent_id) REFERENCES part_categories (id)
+        )
+    ''')
+    
+    # Enhanced Parts table with comprehensive specifications
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS parts (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            category_id INTEGER,
+            manufacturer TEXT,
+            part_number TEXT,
+            description TEXT,
+            datasheet_url TEXT,
+            specifications TEXT,
+            voltage_min REAL,
+            voltage_max REAL,
+            current_rating REAL,
+            power_rating REAL,
+            package_type TEXT,
+            pin_count INTEGER,
+            dimensions TEXT,
+            weight_g REAL,
+            supplier TEXT,
+            supplier_part_number TEXT,
             cost REAL,
-            notes TEXT
+            quantity INTEGER DEFAULT 0,
+            minimum_stock INTEGER DEFAULT 0,
+            location TEXT,
+            status TEXT DEFAULT 'active',
+            tags TEXT,
+            notes TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (category_id) REFERENCES part_categories (id)
+        )
+    ''')
+    
+    # Pin definitions for parts
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS part_pins (
+            id INTEGER PRIMARY KEY,
+            part_id TEXT,
+            pin_number TEXT,
+            pin_label TEXT,
+            pin_type TEXT,
+            description TEXT,
+            voltage REAL,
+            current REAL,
+            FOREIGN KEY (part_id) REFERENCES parts (id) ON DELETE CASCADE
+        )
+    ''')
+    
+    # Documents table for knowledge base
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS documents (
+            id TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            content TEXT,
+            document_type TEXT DEFAULT 'markdown',
+            category TEXT,
+            tags TEXT,
+            file_path TEXT,
+            file_size INTEGER,
+            mime_type TEXT,
+            related_parts TEXT,
+            version INTEGER DEFAULT 1,
+            author TEXT,
+            status TEXT DEFAULT 'active',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
+    # Document versions for history tracking
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS document_versions (
+            id INTEGER PRIMARY KEY,
+            document_id TEXT,
+            version INTEGER,
+            title TEXT,
+            content TEXT,
+            changes_description TEXT,
+            author TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (document_id) REFERENCES documents (id) ON DELETE CASCADE
         )
     ''')
     
@@ -556,7 +641,7 @@ def init_database():
         )
     ''')
     
-    # AI conversation history
+    # AI conversation history with enhanced context
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS ai_conversations (
             id INTEGER PRIMARY KEY,
@@ -564,9 +649,243 @@ def init_database():
             user_message TEXT,
             ai_response TEXT,
             context_data TEXT,
-            tokens_used INTEGER
+            context_parts TEXT,
+            context_documents TEXT,
+            tokens_used INTEGER,
+            session_id TEXT
         )
     ''')
+    
+    # Search index for full-text search (simplified)
+    cursor.execute('''
+        CREATE VIRTUAL TABLE IF NOT EXISTS search_index USING fts5(
+            content_type,
+            item_id,
+            title,
+            content,
+            tags,
+            category
+        )
+    ''')
+    
+    conn.commit()
+    conn.close()
+
+# Seed initial part categories and sample parts
+def seed_initial_data():
+    conn = sqlite3.connect(DATA_DIR / "rover_platform.db")
+    cursor = conn.cursor()
+    
+    # Insert default categories
+    categories = [
+        (1, "Microcontrollers", "Arduino, ESP32, STM32 and other microcontroller boards", None),
+        (2, "Sensors", "Temperature, pressure, accelerometer, GPS sensors", None),
+        (3, "Motors & Actuators", "DC motors, servo motors, stepper motors", None),
+        (4, "Power Management", "Batteries, regulators, power supplies", None),
+        (5, "Communication", "WiFi, Bluetooth, radio modules", None),
+        (6, "Passive Components", "Resistors, capacitors, inductors", None),
+        (7, "Connectors & Cables", "JST, Dupont, USB connectors and cables", None),
+    ]
+    
+    cursor.executemany('''
+        INSERT OR IGNORE INTO part_categories (id, name, description, parent_id)
+        VALUES (?, ?, ?, ?)
+    ''', categories)
+    
+    # Insert rover-specific parts
+    rover_parts = [
+        ("arduino_mega_2560", "Arduino Mega 2560", 1, "Arduino", "A000067", 
+         "Main microcontroller board with 54 digital I/O pins, 16 analog inputs", 
+         "https://docs.arduino.cc/hardware/mega-2560", 
+         '{"flash_memory": "256KB", "sram": "8KB", "eeprom": "4KB", "clock_speed": "16MHz"}',
+         5.0, 12.0, 0.05, 0.6, "DIP", 54, "101.52 x 53.3mm", 40.0,
+         "Arduino Store", "A000067", 45.99, 1, 1, "Main Board", "active",
+         "arduino,microcontroller,main", "Primary rover controller"),
+        
+        ("nodemcu_amica", "NodeMCU Amica V3", 5, "Amica", "NodeMCU-32S",
+         "ESP8266-based WiFi development board for IoT projects",
+         "https://github.com/nodemcu/nodemcu-devkit-v1.0",
+         '{"cpu": "ESP8266", "wifi": "802.11 b/g/n", "gpio_pins": 11, "flash": "4MB"}',
+         3.0, 3.6, 0.17, 0.5, "PCB Module", 11, "58 x 31mm", 10.0,
+         "Adafruit", "2471", 9.95, 1, 1, "Communication Board", "active",
+         "esp8266,wifi,nodemcu", "WiFi bridge for rover communication"),
+        
+        ("riorand_bldc", "RioRand 350W BLDC Controller", 3, "RioRand", "350W-BLDC",
+         "350W Brushless DC Motor Speed Controller",
+         "", 
+         '{"power": "350W", "voltage": "36V", "current": "15A", "control": "PWM"}',
+         24.0, 48.0, 15.0, 350.0, "PCB Module", 3, "65 x 45mm", 120.0,
+         "RioRand", "350W-BLDC", 89.99, 4, 1, "Motor Controllers", "active",
+         "bldc,motor,controller,350w", "Motor speed controllers for hoverboard wheels"),
+        
+        ("hoverboard_wheel", "Hoverboard Wheel Motor", 3, "Generic", "HB-WHEEL-6.5",
+         "6.5 inch hoverboard wheel with built-in brushless motor",
+         "",
+         '{"diameter": "6.5in", "voltage": "36V", "power": "350W", "hall_sensors": 23}',
+         36.0, 36.0, 10.0, 350.0, "Motor Assembly", 23, "165mm diameter", 2500.0,
+         "Generic", "HB-WHEEL-6.5", 59.99, 4, 1, "Wheels Storage", "active",
+         "hoverboard,wheel,motor,hall", "Main drive wheels with integrated motors"),
+        
+        ("battery_36v", "36V Li-ion Battery Pack", 4, "Generic", "36V-10AH",
+         "36V 10Ah Lithium-ion battery pack for electric vehicles",
+         "",
+         '{"voltage": "36V", "capacity": "10Ah", "chemistry": "Li-ion", "bms": true}',
+         36.0, 42.0, 10.0, 360.0, "Battery Pack", 0, "200 x 100 x 80mm", 3000.0,
+         "Generic", "36V-10AH", 199.99, 1, 1, "Battery Compartment", "active",
+         "battery,36v,lithium,motor", "Main motor battery pack"),
+        
+        ("battery_25v", "25.2V Logic Battery", 4, "Generic", "25V-5AH",
+         "25.2V 5Ah Lithium-ion battery for logic systems",
+         "",
+         '{"voltage": "25.2V", "capacity": "5Ah", "chemistry": "Li-ion", "bms": true}',
+         25.2, 29.4, 5.0, 126.0, "Battery Pack", 0, "150 x 80 x 60mm", 1500.0,
+         "Generic", "25V-5AH", 99.99, 0, 1, "Battery Compartment", "low_stock",
+         "battery,25v,lithium,logic", "Logic system battery pack - NEEDS ORDERING")
+    ]
+    
+    cursor.executemany('''
+        INSERT OR IGNORE INTO parts (
+            id, name, category_id, manufacturer, part_number, description,
+            datasheet_url, specifications, voltage_min, voltage_max, current_rating,
+            power_rating, package_type, pin_count, dimensions, weight_g,
+            supplier, supplier_part_number, cost, quantity, minimum_stock,
+            location, status, tags, notes
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ''', rover_parts)
+    
+    # Add pin definitions for key components
+    arduino_pins = [
+        ("arduino_mega_2560", "2", "PWM_FL", "PWM Output", "FL Motor PWM control", 5.0, 0.02),
+        ("arduino_mega_2560", "3", "PWM_FR", "PWM Output", "FR Motor PWM control", 5.0, 0.02),
+        ("arduino_mega_2560", "9", "PWM_RL", "PWM Output", "RL Motor PWM control", 5.0, 0.02),
+        ("arduino_mega_2560", "10", "PWM_RR", "PWM Output", "RR Motor PWM control", 5.0, 0.02),
+        ("arduino_mega_2560", "18", "INT_FL", "Digital Input", "FL Hall sensor interrupt", 5.0, 0.001),
+        ("arduino_mega_2560", "19", "INT_FR", "Digital Input", "FR Hall sensor interrupt", 5.0, 0.001),
+        ("arduino_mega_2560", "20", "INT_RL", "Digital Input", "RL Hall sensor interrupt", 5.0, 0.001),
+        ("arduino_mega_2560", "21", "INT_RR", "Digital Input", "RR Hall sensor interrupt", 5.0, 0.001),
+        ("arduino_mega_2560", "22", "E_STOP", "Digital Input", "Emergency stop button", 5.0, 0.001),
+        ("arduino_mega_2560", "A0", "BAT_MOTOR", "Analog Input", "Motor battery voltage", 5.0, 0.001),
+        ("arduino_mega_2560", "A1", "BAT_LOGIC", "Analog Input", "Logic battery voltage", 5.0, 0.001),
+        ("arduino_mega_2560", "A2", "TEMP", "Analog Input", "Temperature sensor", 5.0, 0.001),
+    ]
+    
+    cursor.executemany('''
+        INSERT OR IGNORE INTO part_pins (part_id, pin_number, pin_label, pin_type, description, voltage, current)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    ''', arduino_pins)
+    
+    # Add sample documents
+    sample_docs = [
+        ("rover_wiring_guide", "Rover Wiring Guide", 
+         """# Rover Wiring Diagram and Connections
+
+## Main Power System
+- **Motor Battery**: 36V Li-ion → RioRand BLDC Controllers
+- **Logic Battery**: 25.2V Li-ion → Arduino Mega (via 12V regulator)
+
+## Motor Control Wiring
+- **FL Motor**: Arduino Pin 2 → RioRand Controller 1 PWM
+- **FR Motor**: Arduino Pin 3 → RioRand Controller 2 PWM  
+- **RL Motor**: Arduino Pin 9 → RioRand Controller 3 PWM
+- **RR Motor**: Arduino Pin 10 → RioRand Controller 4 PWM
+
+## Hall Sensor Connections
+- **FL Sensor**: Pin 18 (INT3) - Front Left wheel encoder
+- **FR Sensor**: Pin 19 (INT2) - Front Right wheel encoder
+- **RL Sensor**: Pin 20 (INT1) - Rear Left wheel encoder
+- **RR Sensor**: Pin 21 (INT0) - Rear Right wheel encoder
+
+## Safety Systems
+- **Emergency Stop**: Pin 22 - Physical emergency stop button
+- **Watchdog Timer**: 500ms timeout for connection loss
+
+## Communication
+- **NodeMCU**: Serial1 connection for WiFi bridge
+- **USB**: Programming and debugging via USB cable
+
+## Monitoring Inputs
+- **Motor Battery**: A0 - Voltage divider for 36V monitoring
+- **Logic Battery**: A1 - Voltage divider for 25.2V monitoring  
+- **Temperature**: A2 - Temperature sensor for thermal management
+
+## Important Notes
+- Always connect grounds between all systems
+- Use appropriate fuses for battery connections
+- Test emergency stop functionality before operation
+- Verify hall sensor polarity (23 pulses per revolution)
+""",
+         "markdown", "wiring", "rover,wiring,arduino,motors", "", 0, "text/markdown",
+         "arduino_mega_2560,nodemcu_amica,riorand_bldc", 1, "system", "active"),
+        
+        ("safety_procedures", "Rover Safety Procedures",
+         """# Rover Safety Procedures and Emergency Protocols
+
+## Pre-Operation Checklist
+1. **Battery Check**: Verify both motor (36V) and logic (25.2V) batteries are charged
+2. **Emergency Stop Test**: Press emergency stop button - all motors should stop immediately
+3. **Connection Test**: Verify stable WiFi connection to rover
+4. **Sensor Check**: All 4 hall sensors should show readings in telemetry
+5. **Motor Test**: Low-speed test of each wheel individually
+
+## Emergency Procedures
+### Immediate Stop
+- **Physical**: Red emergency stop button on rover
+- **Software**: Emergency stop button in control panel
+- **Automatic**: 500ms watchdog timer triggers if connection lost
+
+### Battery Management
+- **Motor Battery**: Stop operation if voltage drops below 35V
+- **Logic Battery**: Critical shutdown if voltage drops below 22V
+- **Temperature**: Automatic shutdown if temperature exceeds 80°C
+
+### Fault Conditions
+- **Motor Fault**: Individual wheel fault detection and isolation
+- **Communication Loss**: Automatic emergency stop after 500ms
+- **Sensor Failure**: Alert and degraded operation mode
+
+## Operating Limits
+- **Maximum Speed**: 2 m/s forward/backward
+- **Maximum Turn Rate**: 1 rad/s
+- **Operating Temperature**: -10°C to +60°C
+- **Maximum Slope**: 15 degrees
+- **Battery Voltage Range**: Motor 32-42V, Logic 21-29V
+
+## Maintenance Schedule
+- **Daily**: Visual inspection, battery check, emergency stop test
+- **Weekly**: Hall sensor calibration, motor performance check
+- **Monthly**: Deep inspection, connection tightness, software updates
+
+## Emergency Contacts
+- **System Administrator**: [Your Contact]
+- **Hardware Support**: [Hardware Team]
+- **Emergency Services**: 911 (if applicable)
+""",
+         "markdown", "safety", "rover,safety,emergency,procedures", "", 0, "text/markdown",
+         "arduino_mega_2560,battery_36v,battery_25v", 1, "system", "active")
+    ]
+    
+    cursor.executemany('''
+        INSERT OR IGNORE INTO documents (
+            id, title, content, document_type, category, tags, file_path, 
+            file_size, mime_type, related_parts, version, author, status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ''', sample_docs)
+    
+    # Populate search index
+    search_entries = []
+    
+    # Add parts to search index
+    for part in rover_parts:
+        search_entries.append(("part", part[0], part[1], f"{part[1]} {part[4]} {part[5]}", part[24], part[2]))
+    
+    # Add documents to search index  
+    for doc in sample_docs:
+        search_entries.append(("document", doc[0], doc[1], f"{doc[1]} {doc[2]}", doc[5], doc[4]))
+    
+    cursor.executemany('''
+        INSERT OR IGNORE INTO search_index (content_type, item_id, title, content, tags, category)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ''', search_entries)
     
     conn.commit()
     conn.close()
