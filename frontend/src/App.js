@@ -137,7 +137,7 @@ function App() {
     const turn = normalizedX;
     
     setControlInput(prev => ({ ...prev, forward, turn }));
-    sendControlCommand(forward, turn, prev.speed);
+    sendControlCommand(forward, turn, controlInput.speed);
   };
 
   // Mouse events for joystick
