@@ -486,6 +486,11 @@ int calculateRPM(int wheelIndex) {
   const roverRotation = useRef([0, 0, 0]);
   const heartbeatInterval = useRef(null);
 
+  // Initialize knowledge base data
+  useEffect(() => {
+    loadKnowledgeData();
+  }, []);
+
   // WebSocket connection with heartbeat
   useEffect(() => {
     connectWebSocket();
