@@ -947,6 +947,82 @@ int calculateRPM(int wheelIndex) {
     }
   };
 
+  // Knowledge Base functions
+  const loadKnowledgeData = async () => {
+    try {
+      // Load parts
+      const partsResponse = await fetch(`${BACKEND_URL}/api/knowledge/parts`);
+      const partsData = await partsResponse.json();
+      setParts(partsData.parts || []);
+
+      // Load categories
+      const categoriesResponse = await fetch(`${BACKEND_URL}/api/knowledge/categories`);
+      const categoriesData = await categoriesResponse.json();
+      setCategories(categoriesData.categories || []);
+
+      // Load documents
+      const docsResponse = await fetch(`${BACKEND_URL}/api/knowledge/documents`);
+      const docsData = await docsResponse.json();
+      setDocuments(docsData.documents || []);
+    } catch (error) {
+      console.error('Error loading knowledge base data:', error);
+    }
+  };
+
+  const searchKnowledgeBase = async () => {
+    if (!searchQuery.trim()) return;
+    
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/knowledge/search?q=${encodeURIComponent(searchQuery)}`);
+      const data = await response.json();
+      setSearchResults(data.results || []);
+    } catch (error) {
+      console.error('Error searching knowledge base:', error);
+    }
+  };
+
+  const calculateOhmsLaw = async (values) => {
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/knowledge/calculators/ohms-law`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(values)
+      });
+      const result = await response.json();
+      setCalculatorResults(prev => ({ ...prev, ohmsLaw: result }));
+    } catch (error) {
+      console.error('Error calculating Ohm\'s law:', error);
+    }
+  };
+
+  const calculateVoltageDivider = async (values) => {
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/knowledge/calculators/voltage-divider`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(values)
+      });
+      const result = await response.json();
+      setCalculatorResults(prev => ({ ...prev, voltageDivider: result }));
+    } catch (error) {
+      console.error('Error calculating voltage divider:', error);
+    }
+  };
+
+  const calculateBatteryLife = async (values) => {
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/knowledge/calculators/battery-capacity`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(values)
+      });
+      const result = await response.json();
+      setCalculatorResults(prev => ({ ...prev, batteryLife: result }));
+    } catch (error) {
+      console.error('Error calculating battery life:', error);
+    }
+  };
+
   // Enhanced AI Chat with streaming
   const sendChatMessage = async (messageOverride = null, skipUI = false) => {
     const message = messageOverride || chatInput.trim();
