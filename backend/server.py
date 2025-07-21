@@ -21,6 +21,7 @@ import markdown
 import sqlite3
 from threading import Thread
 import queue
+import math
 
 app = FastAPI(title="Rover Development Platform API")
 
