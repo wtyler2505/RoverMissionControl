@@ -1840,12 +1840,9 @@ int calculateRPM(int wheelIndex) {
               📋 Project Management
             </button>
             <button 
-              className={`nav-btn ${activeModule === 'config' ? 'active' : ''}`}
-              onClick={() => setActiveModule('config')}
+              className={`nav-btn ${activeModule === 'knowledge' ? 'active' : ''}`}
+              onClick={() => setActiveModule('knowledge')}
             >
-              ⚙️ Configuration
-            </button>
-            <button className="nav-btn">
               📚 Knowledge Base
             </button>
             <button className="nav-btn">
