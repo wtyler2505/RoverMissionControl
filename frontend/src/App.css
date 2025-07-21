@@ -291,21 +291,53 @@ body {
   color: var(--status-warning);
 }
 
-/* ===== WORKSPACE ===== */
+/* ===== WORKSPACE & MODULE LAYOUTS ===== */
 .workspace {
   flex: 1;
-  position: relative;
-  overflow: hidden;
+  overflow: auto;
   background: var(--gradient-primary);
+  padding: 1rem;
 }
 
-/* ===== DRAGGABLE PANELS ===== */
-.draggable-panel {
-  position: absolute;
-  z-index: 10;
+.dashboard-workspace,
+.ide-workspace,
+.project-workspace,
+.config-workspace,
+.ai-workspace {
+  width: 100%;
+  height: 100%;
+  overflow: auto;
 }
 
-.panel-content {
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 1rem;
+  height: 100%;
+  min-height: 600px;
+}
+
+.ide-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  grid-template-rows: 2fr 1fr;
+  gap: 1rem;
+  height: 100%;
+  min-height: 600px;
+}
+
+.project-grid,
+.config-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 1rem;
+  height: 100%;
+  min-height: 600px;
+}
+
+/* ===== STATIC PANELS ===== */
+.panel {
   background: var(--gradient-panel);
   border: 2px solid var(--border-color);
   border-radius: 12px;
@@ -313,11 +345,40 @@ body {
   backdrop-filter: blur(10px);
   overflow: hidden;
   transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
 }
 
-.panel-content:hover {
+.panel:hover {
   border-color: var(--border-color-light);
   box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+}
+
+.panel.minimized {
+  height: 60px;
+  min-height: 60px;
+}
+
+.panel.rover-3d-panel,
+.panel.arduino-panel {
+  grid-row: span 2;
+}
+
+.panel.telemetry-chart-panel,
+.panel.kanban-panel {
+  grid-column: span 2;
+}
+
+.rover-3d-container,
+.chart-container {
+  width: 100%;
+  height: 400px;
+}
+
+.editor-container {
+  height: 500px;
+  display: flex;
+  flex-direction: column;
 }
 
 .panel-header {
