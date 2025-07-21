@@ -1631,7 +1631,15 @@ int calculateRPM(int wheelIndex) {
                             onClick={() => setSelectedPart(part)}
                           >
                             <div className="part-name">{part.name}</div>
-                            <div className="part-specs">{part.specifications}</div>
+                            <div className="part-specs">
+                              {part.specifications && typeof part.specifications === 'object' 
+                                ? Object.entries(part.specifications).map(([key, value]) => (
+                                    <span key={key} className="part-spec">
+                                      {key}: {value}
+                                    </span>
+                                  ))
+                                : part.specifications}
+                            </div>
                           </div>
                         ))}
                       </div>
