@@ -248,8 +248,8 @@ async def websocket_endpoint(websocket: WebSocket):
         manager.disconnect(websocket)
 
 # Add Claude API key to environment if provided
-if not os.getenv("CLAUDE_API_KEY"):
-    os.environ["CLAUDE_API_KEY"] = "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"
+CLAUDE_API_KEY = "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"
+os.environ["CLAUDE_API_KEY"] = CLAUDE_API_KEY
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8001)
