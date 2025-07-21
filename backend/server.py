@@ -110,8 +110,8 @@ class RoverSimulator:
             turn_rate = turn * speed * 1.0  # rad/s
             
             # Update velocity and position
-            self.velocity[0] = actual_speed * np.cos(self.orientation[2])
-            self.velocity[1] = actual_speed * np.sin(self.orientation[2])
+            self.velocity[0] = actual_speed * math.cos(self.orientation[2])
+            self.velocity[1] = actual_speed * math.sin(self.orientation[2])
             
             self.position[0] += self.velocity[0] * dt
             self.position[1] += self.velocity[1] * dt
