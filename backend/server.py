@@ -128,12 +128,18 @@ rover = RoverSimulator()
 async def telemetry_broadcaster():
     """Continuously broadcast rover telemetry"""
     while True:
-        telemetry = rover.get_telemetry()
-        await manager.broadcast(telemetry)
-        await asyncio.sleep(0.1)  # 10Hz update rate
+        try:
+            telemetry = rover.get_telemetry()
+            await manager.broadcast(telemetry)
+            await asyncio.sleep(0.1)  # 10Hz update rate
+        except Exception as e:
+            print(f"Telemetry broadcaster error: {e}")
+            await asyncio.sleep(1)
 
-# Start telemetry broadcasting
-asyncio.create_task(telemetry_broadcaster())
+# Start telemetry broadcasting on startup
+@app.on_event("startup")
+async def startup_event():
+    asyncio.create_task(telemetry_broadcaster())
 
 # API Routes
 @app.get("/api/health")
