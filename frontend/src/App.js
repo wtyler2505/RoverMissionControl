@@ -3,8 +3,6 @@ import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Grid, Box, Text } from '@react-three/drei';
 import { Line } from 'react-chartjs-2';
 import Editor from '@monaco-editor/react';
-import Draggable from 'react-draggable';
-import { ResizableBox } from 'react-resizable';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -17,7 +15,6 @@ import {
   Filler,
 } from 'chart.js';
 import './App.css';
-import 'react-resizable/css/styles.css';
 
 ChartJS.register(
   CategoryScale,
@@ -63,39 +60,28 @@ function RoverModel({ position, rotation, wheelSpeeds }) {
   );
 }
 
-// Draggable Panel Component
-function DraggablePanel({ title, children, defaultPosition, defaultSize, className = "" }) {
-  const [size, setSize] = useState(defaultSize);
-  
+// Static Panel Component (React 19 Compatible)
+function Panel({ title, children, className = "", isMinimized = false, onToggleMinimize }) {
   return (
-    <Draggable
-      defaultPosition={defaultPosition}
-      handle=".panel-header"
-      bounds="parent"
-    >
-      <div className={`draggable-panel ${className}`}>
-        <ResizableBox
-          width={size.width}
-          height={size.height}
-          onResize={(e, data) => setSize({ width: data.size.width, height: data.size.height })}
-          minConstraints={[300, 200]}
-          maxConstraints={[800, 600]}
-        >
-          <div className="panel-content">
-            <div className="panel-header">
-              <h3 className="panel-title">{title}</h3>
-              <div className="panel-controls">
-                <button className="panel-btn minimize">−</button>
-                <button className="panel-btn close">×</button>
-              </div>
-            </div>
-            <div className="panel-body" style={{ height: size.height - 40 }}>
-              {children}
-            </div>
-          </div>
-        </ResizableBox>
+    <div className={`panel ${className} ${isMinimized ? 'minimized' : ''}`}>
+      <div className="panel-header">
+        <h3 className="panel-title">{title}</h3>
+        <div className="panel-controls">
+          <button 
+            className="panel-btn minimize" 
+            onClick={onToggleMinimize}
+            title={isMinimized ? "Maximize" : "Minimize"}
+          >
+            {isMinimized ? '+' : '−'}
+          </button>
+        </div>
       </div>
-    </Draggable>
+      {!isMinimized && (
+        <div className="panel-body">
+          {children}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -107,6 +93,22 @@ function App() {
   const [isConnected, setIsConnected] = useState(false);
   const [emergencyStop, setEmergencyStop] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  
+  // Panel minimize states
+  const [panelStates, setPanelStates] = useState({
+    rover3d: false,
+    telemetryChart: false,
+    control: false,
+    status: false,
+    arduino: false,
+    serial: false,
+    compilation: false,
+    kanban: false,
+    inventory: false,
+    config: false,
+    pinmap: false,
+    ai: false
+  });
   
   // Control State
   const [controlInput, setControlInput] = useState({
@@ -269,7 +271,7 @@ void sendTelemetry() {
       
       // Update 3D rover position (mock physics)
       if (data.control) {
-        const speed = data.control.speed || 0;
+        const speed = data.control.speed_multiplier || 0;
         const forward = data.control.forward || 0;
         const turn = data.control.turn || 0;
         
@@ -305,6 +307,61 @@ void sendTelemetry() {
       console.error('Emergency stop error:', error);
     }
   };
+
+  const handleJoystickMove = (clientX, clientY) => {
+    if (!joystickRef.current) return;
+    
+    const rect = joystickRef.current.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    
+    const maxRadius = rect.width / 2 - 10;
+    const deltaX = clientX - centerX;
+    const deltaY = clientY - centerY;
+    const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+    
+    let normalizedX = deltaX / maxRadius;
+    let normalizedY = deltaY / maxRadius;
+    
+    if (distance > maxRadius) {
+      normalizedX = (deltaX / distance) * 1;
+      normalizedY = (deltaY / distance) * 1;
+    }
+    
+    const forward = -normalizedY; // Invert Y axis
+    const turn = normalizedX;
+    
+    setControlInput(prev => ({ ...prev, forward, turn }));
+    sendControlCommand(forward, turn, controlInput.speed);
+  };
+
+  const handleMouseDown = (e) => {
+    if (emergencyStop) return;
+    isDragging.current = true;
+    handleJoystickMove(e.clientX, e.clientY);
+  };
+
+  const handleMouseMove = (e) => {
+    if (isDragging.current && !emergencyStop) {
+      handleJoystickMove(e.clientX, e.clientY);
+    }
+  };
+
+  const handleMouseUp = () => {
+    isDragging.current = false;
+    setControlInput(prev => ({ ...prev, forward: 0, turn: 0 }));
+    sendControlCommand(0, 0, controlInput.speed);
+  };
+
+  useEffect(() => {
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [emergencyStop, controlInput.speed]);
 
   // Arduino IDE Functions
   const compileArduinoCode = async () => {
@@ -377,13 +434,18 @@ void sendTelemetry() {
       setChatMessages(prev => [...prev, { 
         role: 'assistant', 
         content: data.response,
-        actions: data.actions // Code insertions, file creations, etc.
+        actions: data.actions
       }]);
     } catch (error) {
       setChatMessages(prev => [...prev, { role: 'assistant', content: `Error: ${error.message}` }]);
     }
     
     setIsAITyping(false);
+  };
+
+  // Panel toggle function
+  const togglePanel = (panelId) => {
+    setPanelStates(prev => ({ ...prev, [panelId]: !prev[panelId] }));
   };
 
   // Data Recording
@@ -423,7 +485,7 @@ void sendTelemetry() {
         fill: false,
       },
       {
-        label: 'FR RPM',
+        label: 'FR RPM', 
         data: telemetryHistory.map(t => t.wheels?.fr?.rpm || 0),
         borderColor: '#10b981',
         fill: false,
@@ -448,421 +510,415 @@ void sendTelemetry() {
       case 'dashboard':
         return (
           <div className="dashboard-workspace">
-            {/* Real-time 3D Visualization */}
-            <DraggablePanel 
-              title="🚀 ROVER 3D VISUALIZATION" 
-              defaultPosition={{ x: 20, y: 60 }}
-              defaultSize={{ width: 500, height: 400 }}
-            >
-              <div style={{ width: '100%', height: '100%' }}>
-                <Canvas camera={{ position: [5, 5, 5] }}>
-                  <ambientLight intensity={0.5} />
-                  <pointLight position={[10, 10, 10]} />
-                  <RoverModel 
-                    position={roverPosition.current}
-                    rotation={roverRotation.current}
-                    wheelSpeeds={telemetry?.wheels || { fl: 0, fr: 0, rl: 0, rr: 0 }}
-                  />
-                  <Grid infiniteGrid />
-                  <OrbitControls />
-                </Canvas>
-              </div>
-            </DraggablePanel>
+            <div className="dashboard-grid">
+              {/* 3D Rover Visualization */}
+              <Panel 
+                title="🚀 ROVER 3D VISUALIZATION" 
+                className="rover-3d-panel"
+                isMinimized={panelStates.rover3d}
+                onToggleMinimize={() => togglePanel('rover3d')}
+              >
+                <div className="rover-3d-container">
+                  <Canvas camera={{ position: [5, 5, 5] }}>
+                    <ambientLight intensity={0.5} />
+                    <pointLight position={[10, 10, 10]} />
+                    <RoverModel 
+                      position={roverPosition.current}
+                      rotation={roverRotation.current}
+                      wheelSpeeds={telemetry?.wheels || { fl: 0, fr: 0, rl: 0, rr: 0 }}
+                    />
+                    <Grid infiniteGrid />
+                    <OrbitControls />
+                  </Canvas>
+                </div>
+              </Panel>
 
-            {/* Telemetry Charts */}
-            <DraggablePanel 
-              title="📊 REAL-TIME TELEMETRY" 
-              defaultPosition={{ x: 540, y: 60 }}
-              defaultSize={{ width: 600, height: 300 }}
-            >
-              <div style={{ width: '100%', height: '100%', padding: '10px' }}>
-                <Line data={chartData} options={{ 
-                  responsive: true, 
-                  maintainAspectRatio: false,
-                  scales: { y: { beginAtZero: true } }
-                }} />
-              </div>
-            </DraggablePanel>
+              {/* Telemetry Charts */}
+              <Panel 
+                title="📊 REAL-TIME TELEMETRY" 
+                className="telemetry-chart-panel"
+                isMinimized={panelStates.telemetryChart}
+                onToggleMinimize={() => togglePanel('telemetryChart')}
+              >
+                <div className="chart-container">
+                  <Line data={chartData} options={{ 
+                    responsive: true, 
+                    maintainAspectRatio: false,
+                    scales: { y: { beginAtZero: true } }
+                  }} />
+                </div>
+              </Panel>
 
-            {/* Control Panel */}
-            <DraggablePanel 
-              title="🎮 ROVER CONTROL" 
-              defaultPosition={{ x: 20, y: 480 }}
-              defaultSize={{ width: 400, height: 350 }}
-            >
-              <div className="control-content">
-                <button 
-                  className={`emergency-stop ${emergencyStop ? 'active' : ''}`}
-                  onClick={handleEmergencyStop}
-                >
-                  {emergencyStop ? 'STOPPED' : 'EMERGENCY STOP'}
-                </button>
+              {/* Control Panel */}
+              <Panel 
+                title="🎮 ROVER CONTROL" 
+                className="control-panel"
+                isMinimized={panelStates.control}
+                onToggleMinimize={() => togglePanel('control')}
+              >
+                <div className="control-content">
+                  <button 
+                    className={`emergency-stop ${emergencyStop ? 'active' : ''}`}
+                    onClick={handleEmergencyStop}
+                  >
+                    {emergencyStop ? 'STOPPED' : 'EMERGENCY STOP'}
+                  </button>
 
-                <div className="joystick-container">
-                  <div ref={joystickRef} className="joystick">
-                    <div 
-                      className="joystick-knob"
-                      style={{
-                        transform: `translate(${controlInput.turn * 40}px, ${-controlInput.forward * 40}px)`
-                      }}
+                  <div className="joystick-container">
+                    <div ref={joystickRef} className="joystick" onMouseDown={handleMouseDown}>
+                      <div 
+                        className="joystick-knob"
+                        style={{
+                          transform: `translate(${controlInput.turn * 40}px, ${-controlInput.forward * 40}px)`
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="speed-control">
+                    <label>Speed: {Math.round(controlInput.speed * 100)}%</label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.1"
+                      value={controlInput.speed}
+                      onChange={(e) => setControlInput(prev => ({ ...prev, speed: parseFloat(e.target.value) }))}
+                      disabled={emergencyStop}
                     />
                   </div>
-                </div>
 
-                <div className="speed-control">
-                  <label>Speed: {Math.round(controlInput.speed * 100)}%</label>
-                  <input
-                    type="range"
-                    min="0"
-                    max="1"
-                    step="0.1"
-                    value={controlInput.speed}
-                    onChange={(e) => setControlInput(prev => ({ ...prev, speed: parseFloat(e.target.value) }))}
-                    disabled={emergencyStop}
-                  />
+                  <div className="data-recording">
+                    <button onClick={toggleRecording}>
+                      {isRecording ? '⏹ Stop Recording' : '⏺ Start Recording'}
+                    </button>
+                    <button onClick={() => exportData('csv')}>Export CSV</button>
+                    <button onClick={() => exportData('json')}>Export JSON</button>
+                  </div>
                 </div>
+              </Panel>
 
-                <div className="data-recording">
-                  <button onClick={toggleRecording}>
-                    {isRecording ? '⏹ Stop Recording' : '⏺ Start Recording'}
-                  </button>
-                  <button onClick={() => exportData('csv')}>Export CSV</button>
-                  <button onClick={() => exportData('json')}>Export JSON</button>
+              {/* Status Panel */}
+              <Panel 
+                title="📋 SYSTEM STATUS" 
+                className="status-panel"
+                isMinimized={panelStates.status}
+                onToggleMinimize={() => togglePanel('status')}
+              >
+                <div className="status-grid">
+                  <div className="status-row">
+                    <span>Connection:</span>
+                    <span className={isConnected ? 'status-good' : 'status-bad'}>
+                      {isConnected ? 'CONNECTED' : 'DISCONNECTED'}
+                    </span>
+                  </div>
+                  <div className="status-row">
+                    <span>Motor Battery:</span>
+                    <span>{telemetry?.battery?.motor?.voltage || '0.0'}V</span>
+                  </div>
+                  <div className="status-row">
+                    <span>Logic Battery:</span>
+                    <span>{telemetry?.battery?.logic?.voltage || '0.0'}V</span>
+                  </div>
+                  <div className="status-row">
+                    <span>Temperature:</span>
+                    <span className={telemetry?.temp > 70 ? 'status-warning' : ''}>
+                      {telemetry?.temp || '0.0'}°C
+                    </span>
+                  </div>
+                  <div className="status-row">
+                    <span>Uptime:</span>
+                    <span>{telemetry?.uptime ? Math.floor(telemetry.uptime / 1000) : 0}s</span>
+                  </div>
                 </div>
-              </div>
-            </DraggablePanel>
-
-            {/* Status Panel */}
-            <DraggablePanel 
-              title="📋 SYSTEM STATUS" 
-              defaultPosition={{ x: 440, y: 480 }}
-              defaultSize={{ width: 350, height: 250 }}
-            >
-              <div className="status-grid">
-                <div className="status-row">
-                  <span>Connection:</span>
-                  <span className={isConnected ? 'status-good' : 'status-bad'}>
-                    {isConnected ? 'CONNECTED' : 'DISCONNECTED'}
-                  </span>
-                </div>
-                <div className="status-row">
-                  <span>Motor Battery:</span>
-                  <span>{telemetry?.battery?.motor || '0.0'}V</span>
-                </div>
-                <div className="status-row">
-                  <span>Logic Battery:</span>
-                  <span>{telemetry?.battery?.logic || '0.0'}V</span>
-                </div>
-                <div className="status-row">
-                  <span>Temperature:</span>
-                  <span className={telemetry?.temp > 70 ? 'status-warning' : ''}>
-                    {telemetry?.temp || '0.0'}°C
-                  </span>
-                </div>
-                <div className="status-row">
-                  <span>Uptime:</span>
-                  <span>{telemetry?.uptime ? Math.floor(telemetry.uptime / 1000) : 0}s</span>
-                </div>
-              </div>
-            </DraggablePanel>
+              </Panel>
+            </div>
           </div>
         );
 
       case 'ide':
         return (
           <div className="ide-workspace">
-            {/* Code Editor */}
-            <DraggablePanel 
-              title="💻 ARDUINO IDE" 
-              defaultPosition={{ x: 20, y: 60 }}
-              defaultSize={{ width: 700, height: 500 }}
-            >
-              <div style={{ width: '100%', height: '100%' }}>
-                <div className="editor-toolbar">
-                  <button onClick={compileArduinoCode} className="toolbar-btn compile">
-                    🔨 Compile
-                  </button>
-                  <button onClick={uploadArduinoCode} className="toolbar-btn upload">
-                    📤 Upload
-                  </button>
-                  <select 
-                    value={selectedPort} 
-                    onChange={(e) => setSelectedPort(e.target.value)}
-                    className="port-select"
-                  >
-                    {availablePorts.map(port => (
-                      <option key={port} value={port}>{port}</option>
-                    ))}
-                  </select>
-                  <button onClick={connectSerialMonitor} className="toolbar-btn serial">
-                    📺 Serial Monitor
-                  </button>
+            <div className="ide-grid">
+              {/* Code Editor */}
+              <Panel 
+                title="💻 ARDUINO IDE" 
+                className="arduino-panel"
+                isMinimized={panelStates.arduino}
+                onToggleMinimize={() => togglePanel('arduino')}
+              >
+                <div className="editor-container">
+                  <div className="editor-toolbar">
+                    <button onClick={compileArduinoCode} className="toolbar-btn compile">
+                      🔨 Compile
+                    </button>
+                    <button onClick={uploadArduinoCode} className="toolbar-btn upload">
+                      📤 Upload
+                    </button>
+                    <select 
+                      value={selectedPort} 
+                      onChange={(e) => setSelectedPort(e.target.value)}
+                      className="port-select"
+                    >
+                      {availablePorts.map(port => (
+                        <option key={port} value={port}>{port}</option>
+                      ))}
+                    </select>
+                    <button onClick={connectSerialMonitor} className="toolbar-btn serial">
+                      📺 Serial Monitor
+                    </button>
+                  </div>
+                  
+                  <Editor
+                    height="400px"
+                    defaultLanguage="cpp"
+                    theme="vs-dark"
+                    value={arduinoCode}
+                    onChange={(value) => setArduinoCode(value)}
+                    options={{
+                      minimap: { enabled: false },
+                      fontSize: 14,
+                      wordWrap: 'on',
+                      automaticLayout: true,
+                    }}
+                  />
                 </div>
-                
-                <Editor
-                  height="400px"
-                  defaultLanguage="cpp"
-                  theme="vs-dark"
-                  value={arduinoCode}
-                  onChange={(value) => setArduinoCode(value)}
-                  options={{
-                    minimap: { enabled: false },
-                    fontSize: 14,
-                    wordWrap: 'on',
-                    automaticLayout: true,
-                  }}
-                />
-              </div>
-            </DraggablePanel>
+              </Panel>
 
-            {/* Serial Monitor */}
-            <DraggablePanel 
-              title="📺 SERIAL MONITOR" 
-              defaultPosition={{ x: 740, y: 60 }}
-              defaultSize={{ width: 400, height: 300 }}
-            >
-              <div className="serial-monitor">
-                <div className="serial-controls">
-                  <button onClick={connectSerialMonitor}>Connect</button>
-                  <button onClick={() => setSerialMonitor('')}>Clear</button>
+              {/* Serial Monitor */}
+              <Panel 
+                title="📺 SERIAL MONITOR" 
+                className="serial-panel"
+                isMinimized={panelStates.serial}
+                onToggleMinimize={() => togglePanel('serial')}
+              >
+                <div className="serial-monitor">
+                  <div className="serial-controls">
+                    <button onClick={connectSerialMonitor}>Connect</button>
+                    <button onClick={() => setSerialMonitor('')}>Clear</button>
+                  </div>
+                  <textarea
+                    className="serial-output"
+                    value={serialMonitor}
+                    readOnly
+                    placeholder="Serial output will appear here..."
+                  />
                 </div>
-                <textarea
-                  className="serial-output"
-                  value={serialMonitor}
-                  readOnly
-                  placeholder="Serial output will appear here..."
-                />
-              </div>
-            </DraggablePanel>
+              </Panel>
 
-            {/* Compilation Output */}
-            <DraggablePanel 
-              title="🔨 COMPILATION OUTPUT" 
-              defaultPosition={{ x: 740, y: 380 }}
-              defaultSize={{ width: 400, height: 200 }}
-            >
-              <div className="compilation-output">
-                <textarea
-                  value={compilationOutput}
-                  readOnly
-                  placeholder="Compilation results will appear here..."
-                />
-              </div>
-            </DraggablePanel>
+              {/* Compilation Output */}
+              <Panel 
+                title="🔨 COMPILATION OUTPUT" 
+                className="compilation-panel"
+                isMinimized={panelStates.compilation}
+                onToggleMinimize={() => togglePanel('compilation')}
+              >
+                <div className="compilation-output">
+                  <textarea
+                    value={compilationOutput}
+                    readOnly
+                    placeholder="Compilation results will appear here..."
+                  />
+                </div>
+              </Panel>
+            </div>
           </div>
         );
 
       case 'project':
         return (
           <div className="project-workspace">
-            {/* Kanban Board */}
-            <DraggablePanel 
-              title="📋 PROJECT KANBAN" 
-              defaultPosition={{ x: 20, y: 60 }}
-              defaultSize={{ width: 800, height: 400 }}
-            >
-              <div className="kanban-board">
-                {['todo', 'in-progress', 'done'].map(status => (
-                  <div key={status} className="kanban-column">
-                    <h4 className="column-header">{status.toUpperCase()}</h4>
-                    <div className="task-list">
-                      {projectTasks.filter(task => task.status === status).map(task => (
-                        <div key={task.id} className={`task-card priority-${task.priority}`}>
-                          <div className="task-title">{task.title}</div>
-                          <div className="task-meta">
-                            <span className={`priority priority-${task.priority}`}>
-                              {task.priority}
-                            </span>
+            <div className="project-grid">
+              {/* Kanban Board */}
+              <Panel 
+                title="📋 PROJECT KANBAN" 
+                className="kanban-panel"
+                isMinimized={panelStates.kanban}
+                onToggleMinimize={() => togglePanel('kanban')}
+              >
+                <div className="kanban-board">
+                  {['todo', 'in-progress', 'done'].map(status => (
+                    <div key={status} className="kanban-column">
+                      <h4 className="column-header">{status.toUpperCase()}</h4>
+                      <div className="task-list">
+                        {projectTasks.filter(task => task.status === status).map(task => (
+                          <div key={task.id} className={`task-card priority-${task.priority}`}>
+                            <div className="task-title">{task.title}</div>
+                            <div className="task-meta">
+                              <span className={`priority priority-${task.priority}`}>
+                                {task.priority}
+                              </span>
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            </DraggablePanel>
+                  ))}
+                </div>
+              </Panel>
 
-            {/* Component Inventory */}
-            <DraggablePanel 
-              title="📦 COMPONENT INVENTORY" 
-              defaultPosition={{ x: 20, y: 480 }}
-              defaultSize={{ width: 400, height: 250 }}
-            >
-              <div className="inventory-list">
-                <div className="inventory-item">
-                  <span>Arduino Mega 2560</span>
-                  <span className="quantity">1x ✅</span>
+              {/* Component Inventory */}
+              <Panel 
+                title="📦 COMPONENT INVENTORY" 
+                className="inventory-panel"
+                isMinimized={panelStates.inventory}
+                onToggleMinimize={() => togglePanel('inventory')}
+              >
+                <div className="inventory-list">
+                  <div className="inventory-item">
+                    <span>Arduino Mega 2560</span>
+                    <span className="quantity">1x ✅</span>
+                  </div>
+                  <div className="inventory-item">
+                    <span>NodeMCU Amica</span>
+                    <span className="quantity">1x ✅</span>
+                  </div>
+                  <div className="inventory-item">
+                    <span>RioRand BLDC Controllers</span>
+                    <span className="quantity">4x ✅</span>
+                  </div>
+                  <div className="inventory-item">
+                    <span>Hoverboard Wheels</span>
+                    <span className="quantity">4x ✅</span>
+                  </div>
+                  <div className="inventory-item">
+                    <span>36V Battery</span>
+                    <span className="quantity">1x ⚠️</span>
+                  </div>
+                  <div className="inventory-item">
+                    <span>25.2V Battery</span>
+                    <span className="quantity">1x ❌</span>
+                  </div>
                 </div>
-                <div className="inventory-item">
-                  <span>NodeMCU Amica</span>
-                  <span className="quantity">1x ✅</span>
-                </div>
-                <div className="inventory-item">
-                  <span>RioRand BLDC Controllers</span>
-                  <span className="quantity">4x ✅</span>
-                </div>
-                <div className="inventory-item">
-                  <span>Hoverboard Wheels</span>
-                  <span className="quantity">4x ✅</span>
-                </div>
-                <div className="inventory-item">
-                  <span>36V Battery</span>
-                  <span className="quantity">1x ⚠️</span>
-                </div>
-                <div className="inventory-item">
-                  <span>25.2V Battery</span>
-                  <span className="quantity">1x ❌</span>
-                </div>
-              </div>
-            </DraggablePanel>
+              </Panel>
+            </div>
           </div>
         );
 
       case 'config':
         return (
           <div className="config-workspace">
-            {/* Hardware Configuration */}
-            <DraggablePanel 
-              title="⚙️ HARDWARE CONFIGURATION" 
-              defaultPosition={{ x: 20, y: 60 }}
-              defaultSize={{ width: 600, height: 500 }}
-            >
-              <div className="config-form">
-                <div className="config-section">
-                  <h4>Motor Control</h4>
-                  <label>
-                    PWM Frequency (Hz):
-                    <input
-                      type="number"
-                      value={config.motorPWMFrequency}
-                      onChange={(e) => setConfig(prev => ({
-                        ...prev,
-                        motorPWMFrequency: parseInt(e.target.value)
-                      }))}
-                    />
-                  </label>
-                  <label>
-                    Max Speed (0-255):
-                    <input
-                      type="number"
-                      value={config.maxSpeed}
-                      onChange={(e) => setConfig(prev => ({
-                        ...prev,
-                        maxSpeed: parseInt(e.target.value)
-                      }))}
-                    />
-                  </label>
+            <div className="config-grid">
+              {/* Hardware Configuration */}
+              <Panel 
+                title="⚙️ HARDWARE CONFIGURATION" 
+                className="config-panel"
+                isMinimized={panelStates.config}
+                onToggleMinimize={() => togglePanel('config')}
+              >
+                <div className="config-form">
+                  <div className="config-section">
+                    <h4>Motor Control</h4>
+                    <label>
+                      PWM Frequency (Hz):
+                      <input
+                        type="number"
+                        value={config.motorPWMFrequency}
+                        onChange={(e) => setConfig(prev => ({
+                          ...prev,
+                          motorPWMFrequency: parseInt(e.target.value)
+                        }))}
+                      />
+                    </label>
+                    <label>
+                      Max Speed (0-255):
+                      <input
+                        type="number"
+                        value={config.maxSpeed}
+                        onChange={(e) => setConfig(prev => ({
+                          ...prev,
+                          maxSpeed: parseInt(e.target.value)
+                        }))}
+                      />
+                    </label>
+                  </div>
+                  
+                  <div className="config-section">
+                    <h4>PID Controller</h4>
+                    <label>
+                      Kp: <input
+                        type="number"
+                        step="0.1"
+                        value={config.pid.kp}
+                        onChange={(e) => setConfig(prev => ({
+                          ...prev,
+                          pid: { ...prev.pid, kp: parseFloat(e.target.value) }
+                        }))}
+                      />
+                    </label>
+                    <label>
+                      Ki: <input
+                        type="number"
+                        step="0.01"
+                        value={config.pid.ki}
+                        onChange={(e) => setConfig(prev => ({
+                          ...prev,
+                          pid: { ...prev.pid, ki: parseFloat(e.target.value) }
+                        }))}
+                      />
+                    </label>
+                    <label>
+                      Kd: <input
+                        type="number"
+                        step="0.01"
+                        value={config.pid.kd}
+                        onChange={(e) => setConfig(prev => ({
+                          ...prev,
+                          pid: { ...prev.pid, kd: parseFloat(e.target.value) }
+                        }))}
+                      />
+                    </label>
+                  </div>
+                  
+                  <div className="config-actions">
+                    <button className="config-btn save">💾 Save Configuration</button>
+                    <button className="config-btn load">📁 Load Configuration</button>
+                    <button className="config-btn export">📤 Export Config</button>
+                  </div>
                 </div>
-                
-                <div className="config-section">
-                  <h4>Sensors</h4>
-                  <label>
-                    Hall Sensor PPR:
-                    <input
-                      type="number"
-                      value={config.hallSensorPPR}
-                      onChange={(e) => setConfig(prev => ({
-                        ...prev,
-                        hallSensorPPR: parseInt(e.target.value)
-                      }))}
-                    />
-                  </label>
-                  <label>
-                    Battery Voltage Pin:
-                    <input
-                      type="text"
-                      value={config.batteryVoltagePin}
-                      onChange={(e) => setConfig(prev => ({
-                        ...prev,
-                        batteryVoltagePin: e.target.value
-                      }))}
-                    />
-                  </label>
-                </div>
+              </Panel>
 
-                <div className="config-section">
-                  <h4>PID Controller</h4>
-                  <label>
-                    Kp: <input
-                      type="number"
-                      step="0.1"
-                      value={config.pid.kp}
-                      onChange={(e) => setConfig(prev => ({
-                        ...prev,
-                        pid: { ...prev.pid, kp: parseFloat(e.target.value) }
-                      }))}
-                    />
-                  </label>
-                  <label>
-                    Ki: <input
-                      type="number"
-                      step="0.01"
-                      value={config.pid.ki}
-                      onChange={(e) => setConfig(prev => ({
-                        ...prev,
-                        pid: { ...prev.pid, ki: parseFloat(e.target.value) }
-                      }))}
-                    />
-                  </label>
-                  <label>
-                    Kd: <input
-                      type="number"
-                      step="0.01"
-                      value={config.pid.kd}
-                      onChange={(e) => setConfig(prev => ({
-                        ...prev,
-                        pid: { ...prev.pid, kd: parseFloat(e.target.value) }
-                      }))}
-                    />
-                  </label>
+              {/* Pin Mapping */}
+              <Panel 
+                title="🔌 PIN MAPPING" 
+                className="pinmap-panel"
+                isMinimized={panelStates.pinmap}
+                onToggleMinimize={() => togglePanel('pinmap')}
+              >
+                <div className="pin-mapping">
+                  <div className="pin-group">
+                    <h5>Motor PWM Pins</h5>
+                    <div>FL Motor: Pin 2</div>
+                    <div>FR Motor: Pin 3</div>
+                    <div>RL Motor: Pin 9</div>
+                    <div>RR Motor: Pin 10</div>
+                  </div>
+                  <div className="pin-group">
+                    <h5>Hall Sensor Pins</h5>
+                    <div>FL Sensor: Pin 18 (INT3)</div>
+                    <div>FR Sensor: Pin 19 (INT2)</div>
+                    <div>RL Sensor: Pin 20 (INT1)</div>
+                    <div>RR Sensor: Pin 21 (INT0)</div>
+                  </div>
+                  <div className="pin-group">
+                    <h5>Communication</h5>
+                    <div>NodeMCU: Serial1 (Pins 18-19)</div>
+                    <div>I2C: Pins 20-21</div>
+                  </div>
                 </div>
-                
-                <div className="config-actions">
-                  <button className="config-btn save">💾 Save Configuration</button>
-                  <button className="config-btn load">📁 Load Configuration</button>
-                  <button className="config-btn export">📤 Export Config</button>
-                </div>
-              </div>
-            </DraggablePanel>
-
-            {/* Pin Mapping */}
-            <DraggablePanel 
-              title="🔌 PIN MAPPING" 
-              defaultPosition={{ x: 640, y: 60 }}
-              defaultSize={{ width: 400, height: 400 }}
-            >
-              <div className="pin-mapping">
-                <div className="pin-group">
-                  <h5>Motor PWM Pins</h5>
-                  <div>FL Motor: Pin 2</div>
-                  <div>FR Motor: Pin 3</div>
-                  <div>RL Motor: Pin 9</div>
-                  <div>RR Motor: Pin 10</div>
-                </div>
-                <div className="pin-group">
-                  <h5>Hall Sensor Pins</h5>
-                  <div>FL Sensor: Pin 18 (INT3)</div>
-                  <div>FR Sensor: Pin 19 (INT2)</div>
-                  <div>RL Sensor: Pin 20 (INT1)</div>
-                  <div>RR Sensor: Pin 21 (INT0)</div>
-                </div>
-                <div className="pin-group">
-                  <h5>Communication</h5>
-                  <div>NodeMCU: Serial1 (Pins 18-19)</div>
-                  <div>I2C: Pins 20-21</div>
-                </div>
-              </div>
-            </DraggablePanel>
+              </Panel>
+            </div>
           </div>
         );
 
       case 'ai':
         return (
           <div className="ai-workspace">
-            <DraggablePanel 
+            <Panel 
               title="🤖 AI COMMAND CENTER" 
-              defaultPosition={{ x: 20, y: 60 }}
-              defaultSize={{ width: 800, height: 600 }}
+              className="ai-panel"
+              isMinimized={panelStates.ai}
+              onToggleMinimize={() => togglePanel('ai')}
             >
               <div className="ai-chat-container">
                 <div className="context-panel">
@@ -887,7 +943,7 @@ void sendTelemetry() {
                       <br/><br/>
                       I have full context of your rover project including:
                       <br/>• Current Arduino code
-                      <br/>• Real-time telemetry data
+                      <br/>• Real-time telemetry data  
                       <br/>• Serial monitor output
                       <br/>• Hardware configuration
                       <br/><br/>
@@ -933,7 +989,7 @@ void sendTelemetry() {
                   </button>
                 </div>
               </div>
-            </DraggablePanel>
+            </Panel>
           </div>
         );
 
@@ -1038,14 +1094,14 @@ void sendTelemetry() {
             <div className="rover-status-mini">
               <div className="mini-stat">
                 <span>Motor:</span>
-                <span className={`battery-level ${(telemetry?.battery?.motor || 0) < 35 ? 'low' : ''}`}>
-                  {telemetry?.battery?.motor?.toFixed(1) || '0.0'}V
+                <span className={`battery-level ${(telemetry?.battery?.motor?.voltage || 0) < 35 ? 'low' : ''}`}>
+                  {telemetry?.battery?.motor?.voltage?.toFixed(1) || '0.0'}V
                 </span>
               </div>
               <div className="mini-stat">
                 <span>Logic:</span>
-                <span className={`battery-level ${(telemetry?.battery?.logic || 0) < 22 ? 'low' : ''}`}>
-                  {telemetry?.battery?.logic?.toFixed(1) || '0.0'}V
+                <span className={`battery-level ${(telemetry?.battery?.logic?.voltage || 0) < 22 ? 'low' : ''}`}>
+                  {telemetry?.battery?.logic?.voltage?.toFixed(1) || '0.0'}V
                 </span>
               </div>
             </div>
