@@ -245,8 +245,7 @@ function App() {
     compilation: false,
     kanban: false,
     inventory: false,
-    config: false,
-    pinmap: false,
+    knowledge: false,
     ai: false,
     libraries: false,
     gauges: false
