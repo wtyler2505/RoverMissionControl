@@ -224,8 +224,8 @@ void sendTelemetry() {
     hallSensorPPR: 23,
     maxSpeed: 255,
     emergencyStopPin: 22,
-    batteryVoltagePin: A0,
-    temperatureSensorPin: A1,
+    batteryVoltagePin: "A0",
+    temperatureSensorPin: "A1",
     pid: { kp: 1.0, ki: 0.1, kd: 0.05 }
   });
 
