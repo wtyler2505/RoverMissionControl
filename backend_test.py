@@ -11,7 +11,7 @@ import sys
 from datetime import datetime
 
 class RoverAPITester:
-    def __init__(self, base_url="https://11b61b61-2ec2-4b68-93fe-8e792104ddd3.preview.emergentagent.com"):
+    def __init__(self, base_url="https://9c0fea0e-4aab-4c7c-b326-fd0a31a9178a.preview.emergentagent.com"):
         self.base_url = base_url
         self.tests_run = 0
         self.tests_passed = 0
