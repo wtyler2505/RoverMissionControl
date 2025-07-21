@@ -593,7 +593,8 @@ class RoverAPITester:
         print(f"🌐 Testing against: {self.base_url}")
         print("=" * 60)
         
-        # Individual endpoint tests
+        # Core API endpoint tests
+        print("\n📡 Core API Tests:")
         self.test_health_endpoint()
         self.test_rover_status_endpoint()
         self.test_rover_control_endpoint()
@@ -602,7 +603,25 @@ class RoverAPITester:
         self.test_ai_chat_endpoint()
         self.test_invalid_endpoints()
         
+        # Knowledge Base API tests
+        print("\n📚 Knowledge Base API Tests:")
+        self.test_knowledge_parts_endpoint()
+        self.test_knowledge_parts_search()
+        self.test_knowledge_part_details()
+        self.test_knowledge_categories()
+        self.test_knowledge_documents()
+        self.test_knowledge_document_details()
+        self.test_knowledge_search()
+        self.test_knowledge_search_filtered()
+        
+        # Calculator API tests
+        print("\n🧮 Calculator API Tests:")
+        self.test_calculator_ohms_law()
+        self.test_calculator_voltage_divider()
+        self.test_calculator_battery_capacity()
+        
         # Integration test
+        print("\n🔄 Integration Tests:")
         self.test_control_flow_sequence()
         
         # Summary
