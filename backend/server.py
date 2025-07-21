@@ -23,7 +23,7 @@ app.add_middleware(
 )
 
 # Claude API configuration
-CLAUDE_API_KEY = os.getenv("CLAUDE_API_KEY")
+CLAUDE_API_KEY = "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"
 CLAUDE_API_URL = "https://api.anthropic.com/v1/messages"
 
 # WebSocket connections management
