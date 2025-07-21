@@ -1623,3 +1623,358 @@ canvas {
 .chat-message.assistant {
   animation: slideInFromLeft 0.3s ease;
 }
+
+/* Knowledge Base Styles */
+.knowledge-workspace {
+  padding: 1rem;
+  height: 100%;
+}
+
+.knowledge-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  height: 100%;
+}
+
+.knowledge-panel {
+  background: linear-gradient(145deg, #1a2332, #2a3441);
+  border: 1px solid #3b4a5a;
+  border-radius: 8px;
+  max-height: calc(100vh - 200px);
+  overflow: hidden;
+}
+
+.knowledge-nav {
+  display: flex;
+  border-bottom: 1px solid #3b4a5a;
+  background: #1a2332;
+}
+
+.knowledge-tab {
+  flex: 1;
+  padding: 12px 16px;
+  background: transparent;
+  border: none;
+  color: #8a9ba8;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.knowledge-tab:hover {
+  background: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+}
+
+.knowledge-tab.active {
+  background: #3b82f6;
+  color: white;
+}
+
+.knowledge-content {
+  padding: 1rem;
+  overflow-y: auto;
+  max-height: 600px;
+}
+
+/* Parts Database */
+.parts-database {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.parts-search input {
+  width: 100%;
+  padding: 10px;
+  background: #2a3441;
+  border: 1px solid #3b4a5a;
+  border-radius: 6px;
+  color: white;
+  font-size: 14px;
+}
+
+.parts-categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.category-item {
+  padding: 6px 12px;
+  background: #3b82f6;
+  color: white;
+  border-radius: 20px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.category-item:hover {
+  background: #2563eb;
+}
+
+.parts-list {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.part-item {
+  padding: 12px;
+  background: #2a3441;
+  border: 1px solid #3b4a5a;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.part-item:hover {
+  border-color: #3b82f6;
+  background: #334155;
+}
+
+.part-name {
+  font-weight: bold;
+  color: #3b82f6;
+  margin-bottom: 4px;
+}
+
+.part-description {
+  color: #94a3b8;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+
+.part-specs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.part-spec {
+  background: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.part-stock {
+  float: right;
+  font-size: 12px;
+  color: #10b981;
+}
+
+.part-stock.low {
+  color: #f59e0b;
+}
+
+.part-stock.empty {
+  color: #ef4444;
+}
+
+/* Documentation */
+.docs-list {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.doc-item {
+  padding: 12px;
+  background: #2a3441;
+  border: 1px solid #3b4a5a;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.doc-item:hover {
+  border-color: #10b981;
+  background: #334155;
+}
+
+.doc-title {
+  font-weight: bold;
+  color: #10b981;
+  margin-bottom: 4px;
+}
+
+.doc-preview {
+  color: #94a3b8;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+/* Search Results */
+.search-controls {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.search-controls input {
+  flex: 1;
+  padding: 10px;
+  background: #2a3441;
+  border: 1px solid #3b4a5a;
+  border-radius: 6px;
+  color: white;
+}
+
+.search-controls button {
+  padding: 10px 16px;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.search-results {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.search-result {
+  padding: 12px;
+  background: #2a3441;
+  border: 1px solid #3b4a5a;
+  border-radius: 6px;
+}
+
+.result-type {
+  display: inline-block;
+  padding: 2px 8px;
+  background: #3b82f6;
+  color: white;
+  border-radius: 12px;
+  font-size: 11px;
+  margin-bottom: 8px;
+}
+
+.result-title {
+  font-weight: bold;
+  color: white;
+  margin-bottom: 4px;
+}
+
+.result-content {
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+/* Calculators */
+.calculators-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1rem;
+}
+
+.calculator {
+  background: #2a3441;
+  border: 1px solid #3b4a5a;
+  border-radius: 6px;
+  padding: 1rem;
+}
+
+.calculator h4 {
+  color: #3b82f6;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.calc-inputs {
+  display: grid;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.calc-input-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.calc-input-group label {
+  min-width: 80px;
+  color: #94a3b8;
+  font-size: 14px;
+}
+
+.calc-input-group input {
+  flex: 1;
+  padding: 8px;
+  background: #1a2332;
+  border: 1px solid #3b4a5a;
+  border-radius: 4px;
+  color: white;
+  font-size: 14px;
+}
+
+.calc-button {
+  width: 100%;
+  padding: 10px;
+  background: #10b981;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background-color 0.2s;
+}
+
+.calc-button:hover {
+  background: #059669;
+}
+
+.calc-results {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: #1a2332;
+  border-radius: 6px;
+  border: 1px solid #3b4a5a;
+}
+
+.calc-result-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  border-bottom: 1px solid #3b4a5a;
+}
+
+.calc-result-item:last-child {
+  border-bottom: none;
+}
+
+.calc-result-label {
+  color: #94a3b8;
+}
+
+.calc-result-value {
+  color: #10b981;
+  font-weight: bold;
+}
+
+/* Panel States */
+.knowledge-panel.minimized .knowledge-content {
+  display: none;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .calculators-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .knowledge-nav {
+    flex-wrap: wrap;
+  }
+  
+  .knowledge-tab {
+    min-width: 120px;
+  }
+}
