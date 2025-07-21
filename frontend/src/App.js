@@ -469,17 +469,16 @@ int calculateRPM(int wheelIndex) {
     { id: 7, title: 'Implement path planning', status: 'todo', priority: 'low' },
   ]);
   
-  // Configuration State
-  const [config, setConfig] = useState({
-    motorPWMFrequency: 1000,
-    hallSensorPPR: 23,
-    maxSpeed: 255,
-    emergencyStopPin: 22,
-    batteryVoltagePin: "A0",
-    temperatureSensorPin: "A1",
-    watchdogTimeoutMs: 500,
-    pid: { kp: 1.0, ki: 0.1, kd: 0.05 }
-  });
+  // Knowledge Base state
+  const [knowledgeModule, setKnowledgeModule] = useState('parts'); // 'parts', 'docs', 'search', 'calculators'
+  const [parts, setParts] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [documents, setDocuments] = useState([]);
+  const [selectedPart, setSelectedPart] = useState(null);
+  const [selectedDocument, setSelectedDocument] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [calculatorResults, setCalculatorResults] = useState({});
 
   const websocket = useRef(null);
   const joystickRef = useRef(null);
