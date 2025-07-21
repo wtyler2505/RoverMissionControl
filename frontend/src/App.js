@@ -1488,147 +1488,160 @@ int calculateRPM(int wheelIndex) {
           </div>
         );
 
-      case 'config':
+      case 'knowledge':
         return (
-          <div className="config-workspace">
-            <div className="config-grid">
+          <div className="knowledge-workspace">
+            <div className="knowledge-grid">
               <Panel 
-                title="⚙️ HARDWARE CONFIGURATION" 
-                className="config-panel"
-                isMinimized={panelStates.config}
-                onToggleMinimize={() => togglePanel('config')}
+                title="📚 KNOWLEDGE BASE" 
+                className="knowledge-panel"
+                isMinimized={panelStates.knowledge}
+                onToggleMinimize={() => togglePanel('knowledge')}
               >
-                <div className="config-form">
-                  <div className="config-section">
-                    <h4>Motor Control</h4>
-                    <label>
-                      PWM Frequency (Hz):
-                      <input
-                        type="number"
-                        value={config.motorPWMFrequency}
-                        onChange={(e) => setConfig(prev => ({
-                          ...prev,
-                          motorPWMFrequency: parseInt(e.target.value)
-                        }))}
-                      />
-                    </label>
-                    <label>
-                      Max Speed (0-255):
-                      <input
-                        type="number"
-                        value={config.maxSpeed}
-                        onChange={(e) => setConfig(prev => ({
-                          ...prev,
-                          maxSpeed: parseInt(e.target.value)
-                        }))}
-                      />
-                    </label>
-                  </div>
-                  
-                  <div className="config-section">
-                    <h4>Safety Systems</h4>
-                    <label>
-                      Watchdog Timeout (ms):
-                      <input
-                        type="number"
-                        value={config.watchdogTimeoutMs}
-                        onChange={(e) => setConfig(prev => ({
-                          ...prev,
-                          watchdogTimeoutMs: parseInt(e.target.value)
-                        }))}
-                      />
-                    </label>
-                    <label>
-                      Emergency Stop Pin:
-                      <input
-                        type="number"
-                        value={config.emergencyStopPin}
-                        onChange={(e) => setConfig(prev => ({
-                          ...prev,
-                          emergencyStopPin: parseInt(e.target.value)
-                        }))}
-                      />
-                    </label>
-                  </div>
-
-                  <div className="config-section">
-                    <h4>PID Controller</h4>
-                    <label>
-                      Kp: <input
-                        type="number"
-                        step="0.1"
-                        value={config.pid.kp}
-                        onChange={(e) => setConfig(prev => ({
-                          ...prev,
-                          pid: { ...prev.pid, kp: parseFloat(e.target.value) }
-                        }))}
-                      />
-                    </label>
-                    <label>
-                      Ki: <input
-                        type="number"
-                        step="0.01"
-                        value={config.pid.ki}
-                        onChange={(e) => setConfig(prev => ({
-                          ...prev,
-                          pid: { ...prev.pid, ki: parseFloat(e.target.value) }
-                        }))}
-                      />
-                    </label>
-                    <label>
-                      Kd: <input
-                        type="number"
-                        step="0.01"
-                        value={config.pid.kd}
-                        onChange={(e) => setConfig(prev => ({
-                          ...prev,
-                          pid: { ...prev.pid, kd: parseFloat(e.target.value) }
-                        }))}
-                      />
-                    </label>
-                  </div>
-                  
-                  <div className="config-actions">
-                    <button className="config-btn save">💾 Save Configuration</button>
-                    <button className="config-btn load">📁 Load Configuration</button>
-                    <button className="config-btn export">📤 Export Config</button>
-                  </div>
+                <div className="knowledge-nav">
+                  <button 
+                    className={`knowledge-tab ${knowledgeModule === 'parts' ? 'active' : ''}`}
+                    onClick={() => setKnowledgeModule('parts')}
+                  >
+                    🔧 Parts Database
+                  </button>
+                  <button 
+                    className={`knowledge-tab ${knowledgeModule === 'docs' ? 'active' : ''}`}
+                    onClick={() => setKnowledgeModule('docs')}
+                  >
+                    📖 Documentation
+                  </button>
+                  <button 
+                    className={`knowledge-tab ${knowledgeModule === 'search' ? 'active' : ''}`}
+                    onClick={() => setKnowledgeModule('search')}
+                  >
+                    🔍 Search
+                  </button>
+                  <button 
+                    className={`knowledge-tab ${knowledgeModule === 'calculators' ? 'active' : ''}`}
+                    onClick={() => setKnowledgeModule('calculators')}
+                  >
+                    🧮 Calculators
+                  </button>
                 </div>
-              </Panel>
 
-              <Panel 
-                title="🔌 PIN MAPPING" 
-                className="pinmap-panel"
-                isMinimized={panelStates.pinmap}
-                onToggleMinimize={() => togglePanel('pinmap')}
-              >
-                <div className="pin-mapping">
-                  <div className="pin-group">
-                    <h5>Motor PWM Pins</h5>
-                    <div>FL Motor: Pin 2</div>
-                    <div>FR Motor: Pin 3</div>
-                    <div>RL Motor: Pin 9</div>
-                    <div>RR Motor: Pin 10</div>
-                  </div>
-                  <div className="pin-group">
-                    <h5>Hall Sensor Pins</h5>
-                    <div>FL Sensor: Pin 18 (INT3)</div>
-                    <div>FR Sensor: Pin 19 (INT2)</div>
-                    <div>RL Sensor: Pin 20 (INT1)</div>
-                    <div>RR Sensor: Pin 21 (INT0)</div>
-                  </div>
-                  <div className="pin-group">
-                    <h5>Safety & Monitoring</h5>
-                    <div>Emergency Stop: Pin 22</div>
-                    <div>Motor Battery: A0</div>
-                    <div>Logic Battery: A1</div>
-                    <div>Temperature: A2</div>
-                  </div>
-                  <div className="pin-group">
-                    <h5>Communication</h5>
-                    <div>NodeMCU: Serial1 (Pins 18-19)</div>
-                    <div>I2C: Pins 20-21</div>
-                  </div>
+                <div className="knowledge-content">
+                  {knowledgeModule === 'parts' && (
+                    <div className="parts-database">
+                      <div className="parts-search">
+                        <input
+                          type="text"
+                          placeholder="Search parts..."
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                        />
+                      </div>
+                      <div className="parts-categories">
+                        {categories.map((category, index) => (
+                          <div key={index} className="category-item">
+                            {category.name} ({category.count} parts)
+                          </div>
+                        ))}
+                      </div>
+                      <div className="parts-list">
+                        {parts.map((part, index) => (
+                          <div 
+                            key={index} 
+                            className={`part-item ${selectedPart?.id === part.id ? 'selected' : ''}`}
+                            onClick={() => setSelectedPart(part)}
+                          >
+                            <div className="part-name">{part.name}</div>
+                            <div className="part-specs">{part.specifications}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {knowledgeModule === 'docs' && (
+                    <div className="documentation">
+                      <div className="docs-list">
+                        {documents.map((doc, index) => (
+                          <div 
+                            key={index} 
+                            className={`doc-item ${selectedDocument?.id === doc.id ? 'selected' : ''}`}
+                            onClick={() => setSelectedDocument(doc)}
+                          >
+                            <div className="doc-title">{doc.title}</div>
+                            <div className="doc-type">{doc.type}</div>
+                          </div>
+                        ))}
+                      </div>
+                      {selectedDocument && (
+                        <div className="doc-viewer">
+                          <h3>{selectedDocument.title}</h3>
+                          <div className="doc-content">{selectedDocument.content}</div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {knowledgeModule === 'search' && (
+                    <div className="knowledge-search">
+                      <div className="search-input">
+                        <input
+                          type="text"
+                          placeholder="Search knowledge base..."
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                        />
+                        <button>Search</button>
+                      </div>
+                      <div className="search-results">
+                        {searchResults.map((result, index) => (
+                          <div key={index} className="search-result">
+                            <div className="result-title">{result.title}</div>
+                            <div className="result-snippet">{result.snippet}</div>
+                            <div className="result-type">{result.type}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {knowledgeModule === 'calculators' && (
+                    <div className="calculators">
+                      <div className="calculator-grid">
+                        <div className="calculator-item">
+                          <h4>Ohm's Law Calculator</h4>
+                          <div className="calc-inputs">
+                            <input type="number" placeholder="Voltage (V)" />
+                            <input type="number" placeholder="Current (A)" />
+                            <input type="number" placeholder="Resistance (Ω)" />
+                          </div>
+                          <button>Calculate</button>
+                        </div>
+                        <div className="calculator-item">
+                          <h4>Power Calculator</h4>
+                          <div className="calc-inputs">
+                            <input type="number" placeholder="Voltage (V)" />
+                            <input type="number" placeholder="Current (A)" />
+                          </div>
+                          <button>Calculate</button>
+                        </div>
+                        <div className="calculator-item">
+                          <h4>Battery Life Calculator</h4>
+                          <div className="calc-inputs">
+                            <input type="number" placeholder="Capacity (mAh)" />
+                            <input type="number" placeholder="Load (mA)" />
+                          </div>
+                          <button>Calculate</button>
+                        </div>
+                      </div>
+                      <div className="calculator-results">
+                        {Object.entries(calculatorResults).map(([key, value]) => (
+                          <div key={key} className="calc-result">
+                            {key}: {value}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </Panel>
             </div>
