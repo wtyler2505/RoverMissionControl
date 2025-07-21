@@ -1160,7 +1160,357 @@ async def uninstall_library(request: dict):
     result = await library_manager.uninstall_library(library_name)
     return result
 
-# Enhanced AI Chat with Context and Streaming
+# Knowledge Base API Endpoints
+
+# Parts Management
+@app.get("/api/knowledge/parts")
+async def get_parts(
+    category: Optional[str] = None, 
+    search: Optional[str] = None,
+    status: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0
+):
+    """Get parts with optional filtering and search"""
+    try:
+        conn = sqlite3.connect(DATA_DIR / "rover_platform.db")
+        cursor = conn.cursor()
+        
+        # Build query with filters
+        query = """
+            SELECT p.*, c.name as category_name 
+            FROM parts p 
+            LEFT JOIN part_categories c ON p.category_id = c.id 
+            WHERE 1=1
+        """
+        params = []
+        
+        if category:
+            query += " AND c.name = ?"
+            params.append(category)
+            
+        if search:
+            query += " AND (p.name LIKE ? OR p.description LIKE ? OR p.tags LIKE ?)"
+            search_term = f"%{search}%"
+            params.extend([search_term, search_term, search_term])
+            
+        if status:
+            query += " AND p.status = ?"
+            params.append(status)
+            
+        query += " ORDER BY p.name LIMIT ? OFFSET ?"
+        params.extend([limit, offset])
+        
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+        
+        parts = []
+        for row in rows:
+            part = {
+                "id": row[0], "name": row[1], "category_id": row[2], 
+                "manufacturer": row[3], "part_number": row[4], "description": row[5],
+                "datasheet_url": row[6], "specifications": json.loads(row[7]) if row[7] else {},
+                "voltage_min": row[8], "voltage_max": row[9], "current_rating": row[10],
+                "power_rating": row[11], "package_type": row[12], "pin_count": row[13],
+                "dimensions": row[14], "weight_g": row[15], "supplier": row[16],
+                "supplier_part_number": row[17], "cost": row[18], "quantity": row[19],
+                "minimum_stock": row[20], "location": row[21], "status": row[22],
+                "tags": row[23], "notes": row[24], "created_at": row[25], 
+                "updated_at": row[26], "category_name": row[27]
+            }
+            parts.append(part)
+        
+        conn.close()
+        return {"parts": parts, "total": len(parts)}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/knowledge/parts/{part_id}")
+async def get_part_details(part_id: str):
+    """Get detailed part information including pins"""
+    try:
+        conn = sqlite3.connect(DATA_DIR / "rover_platform.db")
+        cursor = conn.cursor()
+        
+        # Get part details
+        cursor.execute("""
+            SELECT p.*, c.name as category_name 
+            FROM parts p 
+            LEFT JOIN part_categories c ON p.category_id = c.id 
+            WHERE p.id = ?
+        """, (part_id,))
+        
+        row = cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Part not found")
+        
+        part = {
+            "id": row[0], "name": row[1], "category_id": row[2], 
+            "manufacturer": row[3], "part_number": row[4], "description": row[5],
+            "datasheet_url": row[6], "specifications": json.loads(row[7]) if row[7] else {},
+            "voltage_min": row[8], "voltage_max": row[9], "current_rating": row[10],
+            "power_rating": row[11], "package_type": row[12], "pin_count": row[13],
+            "dimensions": row[14], "weight_g": row[15], "supplier": row[16],
+            "supplier_part_number": row[17], "cost": row[18], "quantity": row[19],
+            "minimum_stock": row[20], "location": row[21], "status": row[22],
+            "tags": row[23], "notes": row[24], "created_at": row[25], 
+            "updated_at": row[26], "category_name": row[27]
+        }
+        
+        # Get part pins
+        cursor.execute("""
+            SELECT pin_number, pin_label, pin_type, description, voltage, current
+            FROM part_pins WHERE part_id = ?
+            ORDER BY pin_number
+        """, (part_id,))
+        
+        pins = []
+        for pin_row in cursor.fetchall():
+            pins.append({
+                "pin_number": pin_row[0], "pin_label": pin_row[1], "pin_type": pin_row[2],
+                "description": pin_row[3], "voltage": pin_row[4], "current": pin_row[5]
+            })
+        
+        part["pins"] = pins
+        conn.close()
+        return part
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/knowledge/categories")
+async def get_categories():
+    """Get all part categories"""
+    try:
+        conn = sqlite3.connect(DATA_DIR / "rover_platform.db")
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT id, name, description, parent_id, created_at
+            FROM part_categories ORDER BY name
+        """)
+        
+        categories = []
+        for row in cursor.fetchall():
+            categories.append({
+                "id": row[0], "name": row[1], "description": row[2],
+                "parent_id": row[3], "created_at": row[4]
+            })
+        
+        conn.close()
+        return {"categories": categories}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Document Management
+@app.get("/api/knowledge/documents")
+async def get_documents(
+    category: Optional[str] = None,
+    search: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0
+):
+    """Get documents with optional filtering"""
+    try:
+        conn = sqlite3.connect(DATA_DIR / "rover_platform.db")
+        cursor = conn.cursor()
+        
+        query = "SELECT * FROM documents WHERE status = 'active'"
+        params = []
+        
+        if category:
+            query += " AND category = ?"
+            params.append(category)
+            
+        if search:
+            query += " AND (title LIKE ? OR content LIKE ? OR tags LIKE ?)"
+            search_term = f"%{search}%"
+            params.extend([search_term, search_term, search_term])
+        
+        query += " ORDER BY updated_at DESC LIMIT ? OFFSET ?"
+        params.extend([limit, offset])
+        
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+        
+        documents = []
+        for row in rows:
+            doc = {
+                "id": row[0], "title": row[1], "content": row[2][:500] + "..." if len(row[2]) > 500 else row[2],
+                "document_type": row[3], "category": row[4], "tags": row[5], "file_path": row[6],
+                "file_size": row[7], "mime_type": row[8], "related_parts": row[9].split(",") if row[9] else [],
+                "version": row[10], "author": row[11], "status": row[12], 
+                "created_at": row[13], "updated_at": row[14]
+            }
+            documents.append(doc)
+        
+        conn.close()
+        return {"documents": documents, "total": len(documents)}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/knowledge/documents/{doc_id}")
+async def get_document(doc_id: str):
+    """Get full document content"""
+    try:
+        conn = sqlite3.connect(DATA_DIR / "rover_platform.db")
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT * FROM documents WHERE id = ? AND status = 'active'", (doc_id,))
+        row = cursor.fetchone()
+        
+        if not row:
+            raise HTTPException(status_code=404, detail="Document not found")
+        
+        document = {
+            "id": row[0], "title": row[1], "content": row[2], "document_type": row[3],
+            "category": row[4], "tags": row[5], "file_path": row[6], "file_size": row[7],
+            "mime_type": row[8], "related_parts": row[9].split(",") if row[9] else [],
+            "version": row[10], "author": row[11], "status": row[12],
+            "created_at": row[13], "updated_at": row[14]
+        }
+        
+        conn.close()
+        return document
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Search functionality
+@app.get("/api/knowledge/search")
+async def search_knowledge_base(
+    q: str,
+    content_type: Optional[str] = None,
+    limit: int = 20
+):
+    """Search across parts and documents"""
+    try:
+        conn = sqlite3.connect(DATA_DIR / "rover_platform.db")
+        cursor = conn.cursor()
+        
+        query = "SELECT * FROM search_index WHERE search_index MATCH ?"
+        params = [q]
+        
+        if content_type:
+            query += " AND content_type = ?"
+            params.append(content_type)
+            
+        query += " ORDER BY rank LIMIT ?"
+        params.append(limit)
+        
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+        
+        results = []
+        for row in rows:
+            result = {
+                "content_type": row[0], "item_id": row[1], "title": row[2],
+                "content": row[3][:300] + "..." if len(row[3]) > 300 else row[3],
+                "tags": row[4], "category": row[5]
+            }
+            results.append(result)
+        
+        conn.close()
+        return {"results": results, "query": q, "total": len(results)}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Electrical calculators
+@app.post("/api/knowledge/calculators/ohms-law")
+async def ohms_law_calculator(request: dict):
+    """Calculate Ohm's law (V = I * R)"""
+    try:
+        voltage = request.get("voltage")
+        current = request.get("current") 
+        resistance = request.get("resistance")
+        
+        # Calculate missing value
+        if voltage is None:
+            if current is not None and resistance is not None:
+                voltage = current * resistance
+            else:
+                raise ValueError("Need current and resistance to calculate voltage")
+                
+        elif current is None:
+            if voltage is not None and resistance is not None:
+                current = voltage / resistance
+            else:
+                raise ValueError("Need voltage and resistance to calculate current")
+                
+        elif resistance is None:
+            if voltage is not None and current is not None:
+                resistance = voltage / current
+            else:
+                raise ValueError("Need voltage and current to calculate resistance")
+        
+        return {
+            "voltage": round(voltage, 3) if voltage else None,
+            "current": round(current, 3) if current else None,
+            "resistance": round(resistance, 3) if resistance else None,
+            "power": round(voltage * current, 3) if voltage and current else None
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/knowledge/calculators/voltage-divider")
+async def voltage_divider_calculator(request: dict):
+    """Calculate voltage divider output"""
+    try:
+        vin = request.get("vin")
+        r1 = request.get("r1")
+        r2 = request.get("r2")
+        
+        if not all([vin, r1, r2]):
+            raise ValueError("Need input voltage (vin), R1, and R2")
+        
+        vout = vin * (r2 / (r1 + r2))
+        
+        return {
+            "vin": vin,
+            "r1": r1,
+            "r2": r2,
+            "vout": round(vout, 3),
+            "current": round(vin / (r1 + r2), 6),
+            "power_r1": round((vin * r1 / (r1 + r2))**2 / r1, 3),
+            "power_r2": round(vout**2 / r2, 3)
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/knowledge/calculators/battery-capacity")
+async def battery_capacity_calculator(request: dict):
+    """Calculate battery runtime and capacity"""
+    try:
+        capacity_ah = request.get("capacity_ah")
+        load_current_a = request.get("load_current_a")
+        efficiency = request.get("efficiency", 0.85)
+        
+        if not all([capacity_ah, load_current_a]):
+            raise ValueError("Need battery capacity (Ah) and load current (A)")
+        
+        runtime_hours = (capacity_ah * efficiency) / load_current_a
+        
+        return {
+            "capacity_ah": capacity_ah,
+            "load_current_a": load_current_a,
+            "efficiency": efficiency,
+            "runtime_hours": round(runtime_hours, 2),
+            "runtime_minutes": round(runtime_hours * 60, 1),
+            "energy_wh": round(capacity_ah * request.get("voltage", 12), 1) if request.get("voltage") else None
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 async def stream_claude_response(message: str, context: dict) -> AsyncGenerator[str, None]:
     """Stream Claude API response"""
     try:
