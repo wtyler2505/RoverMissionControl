@@ -892,6 +892,20 @@ def seed_initial_data():
 
 init_database()
 
+# Seed initial data if database is empty
+try:
+    conn = sqlite3.connect(DATA_DIR / "rover_platform.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT COUNT(*) FROM part_categories")
+    category_count = cursor.fetchone()[0]
+    conn.close()
+    
+    if category_count == 0:
+        seed_initial_data()
+        logger.info("📚 Seeded initial knowledge base data")
+except Exception as e:
+    logger.error(f"Error checking/seeding database: {e}")
+
 # Background telemetry broadcaster with heartbeat handling
 async def telemetry_broadcaster():
     """Continuously broadcast rover telemetry"""
