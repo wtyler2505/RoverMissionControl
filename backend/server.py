@@ -1511,13 +1511,86 @@ async def battery_capacity_calculator(request: dict):
         
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+# Enhanced AI Chat with Knowledge Base Context and Streaming
+async def get_kb_context(parts_filter: Optional[str] = None) -> str:
+    """Get knowledge base context for AI"""
+    try:
+        conn = sqlite3.connect(DATA_DIR / "rover_platform.db")
+        cursor = conn.cursor()
+        
+        context_parts = []
+        
+        # Get relevant parts
+        if parts_filter:
+            cursor.execute("""
+                SELECT p.name, p.manufacturer, p.part_number, p.description, 
+                       p.specifications, p.voltage_min, p.voltage_max, p.current_rating,
+                       p.quantity, p.status, p.notes, c.name as category
+                FROM parts p
+                LEFT JOIN part_categories c ON p.category_id = c.id
+                WHERE p.id IN ({}) OR p.name LIKE ? OR p.tags LIKE ?
+            """.format(','.join('?' * len(parts_filter.split(',')))), 
+            parts_filter.split(',') + [f'%{parts_filter}%', f'%{parts_filter}%'])
+        else:
+            # Get key rover parts
+            cursor.execute("""
+                SELECT p.name, p.manufacturer, p.part_number, p.description,
+                       p.specifications, p.voltage_min, p.voltage_max, p.current_rating,
+                       p.quantity, p.status, p.notes, c.name as category
+                FROM parts p
+                LEFT JOIN part_categories c ON p.category_id = c.id
+                WHERE p.id IN ('arduino_mega_2560', 'nodemcu_amica', 'riorand_bldc', 'hoverboard_wheel', 'battery_36v', 'battery_25v')
+            """)
+        
+        for row in cursor.fetchall():
+            specs = json.loads(row[4]) if row[4] else {}
+            context_parts.append(f"""
+- {row[0]} ({row[1]} {row[2]}): {row[3]}
+  Category: {row[11]}, Voltage: {row[5]}-{row[6]}V, Current: {row[7]}A
+  Stock: {row[8]} {'(LOW STOCK!)' if row[9] == 'low_stock' else ''}
+  Specs: {', '.join([f'{k}: {v}' for k, v in specs.items()])}
+  Notes: {row[10]}""")
+        
+        # Get recent relevant documents
+        cursor.execute("""
+            SELECT title, content FROM documents 
+            WHERE status = 'active' AND category IN ('wiring', 'safety', 'hardware')
+            ORDER BY updated_at DESC LIMIT 3
+        """)
+        
+        context_docs = []
+        for row in cursor.fetchall():
+            # Get first few lines of content
+            content_preview = '\n'.join(row[1].split('\n')[:10])
+            context_docs.append(f"- {row[0]}:\n{content_preview}")
+        
+        conn.close()
+        
+        kb_context = f"""
+PARTS DATABASE ({len(context_parts)} components):
+{''.join(context_parts)}
+
+DOCUMENTATION EXCERPTS:
+{''.join(context_docs)}
+"""
+        return kb_context
+        
+    except Exception as e:
+        logger.error(f"Error getting KB context: {e}")
+        return ""
+
 async def stream_claude_response(message: str, context: dict) -> AsyncGenerator[str, None]:
-    """Stream Claude API response"""
+    """Stream Claude API response with enhanced knowledge base context"""
     try:
         # Build comprehensive context
         current_telemetry = rover.get_telemetry()
         
-        context_prompt = f"""You are an expert rover development assistant with full access to the current project state:
+        # Get knowledge base context
+        parts_mentioned = context.get('selectedText', '') + ' ' + message
+        kb_context = await get_kb_context(parts_mentioned if any(part in parts_mentioned.lower() 
+                                          for part in ['arduino', 'nodemcu', 'motor', 'battery', 'sensor']) else None)
+        
+        context_prompt = f"""You are an expert rover development assistant with full access to the current project state and comprehensive parts database:
 
 CURRENT ROVER STATUS:
 - Emergency Stop: {current_telemetry['emergency_stop']}
@@ -1531,25 +1604,25 @@ CURRENT ROVER STATUS:
 - Recent Alerts: {[alert['message'] for alert in current_telemetry['alerts']]}
 - System Health: Battery={current_telemetry['system_health']['battery_status']}, Temp={current_telemetry['system_health']['temperature_status']}, Connection={current_telemetry['system_health']['connection_status']}
 
-HARDWARE CONFIGURATION:
-- Arduino Mega 2560 (primary controller) 
-- NodeMCU Amica ESP8266 (WiFi bridge)
-- 4x RioRand 350W BLDC controllers
-- 4x 36V hoverboard wheels (23 hall sensor pulses per revolution)
-- Dual battery system (36V motor, 25.2V logic)
-- PWM pins: FL=2, FR=3, RL=9, RR=10
-- Hall sensor pins: FL=18, FR=19, RL=20, RR=21
-- Emergency stop with watchdog timer (500ms timeout)
+HARDWARE CONFIGURATION & PARTS DATABASE:
+{kb_context}
+
+PIN MAPPINGS (Arduino Mega 2560):
+- Motor PWM: FL=Pin2, FR=Pin3, RL=Pin9, RR=Pin10
+- Hall Sensors: FL=Pin18(INT3), FR=Pin19(INT2), RL=Pin20(INT1), RR=Pin21(INT0)  
+- Safety: Emergency Stop=Pin22, Motor Battery=A0, Logic Battery=A1, Temperature=A2
+- Communication: NodeMCU via Serial1, I2C=Pins20-21
 
 CURRENT CONTEXT:
 - Current Code: {context.get('currentCode', 'Not provided')[:2000]}...
 - Serial Output: {context.get('serialOutput', 'No serial data')[-1000:]}
 - Compilation Output: {context.get('compilationOutput', 'No compilation data')[-500:]}
 - Recent Errors: {context.get('recentErrors', [])}
+- Selected Text: {context.get('selectedText', 'None')}
 
 USER QUESTION: {message}
 
-Provide specific, actionable advice for this rover project. If suggesting code changes, provide complete, working code snippets. If debugging, reference the specific telemetry data and hardware configuration. Focus on safety, performance, and best practices for this specific hardware setup."""
+Provide specific, actionable advice for this rover project. Reference actual part specifications from the database when relevant. If suggesting code changes, provide complete, working code snippets that account for the specific hardware (Arduino Mega with RioRand BLDC controllers, hoverboard wheels with 23 hall pulses/rev, dual battery system). Focus on safety, performance, and best practices for this exact hardware setup."""
 
         headers = {
             "x-api-key": CLAUDE_API_KEY,
@@ -1559,7 +1632,7 @@ Provide specific, actionable advice for this rover project. If suggesting code c
         
         payload = {
             "model": "claude-3-5-sonnet-20241022",
-            "max_tokens": 3000,
+            "max_tokens": 4000,
             "stream": True,
             "messages": [{"role": "user", "content": context_prompt}]
         }
