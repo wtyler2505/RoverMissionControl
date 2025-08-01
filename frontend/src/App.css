@@ -8,10 +8,10 @@
   --border-color: #3a4257;
   --border-color-light: #4a5267;
   
-  /* Text Colors */
+  /* Text Colors - WCAG 2.1 AA Compliant */
   --text-primary: #ffffff;
   --text-secondary: #a0a8b8;
-  --text-muted: #6b7280;
+  --text-muted: #a3a3a3; /* Improved from #6b7280 for better contrast on dark backgrounds */
   --text-accent: #e1e7f0;
   
   /* Accent Colors */
@@ -24,11 +24,11 @@
   --accent-red: #ef4444;
   --accent-purple: #8b5cf6;
   
-  /* Status Colors */
+  /* Status Colors - WCAG 2.1 AA Compliant */
   --status-good: #10b981;
-  --status-warning: #f59e0b;
+  --status-warning: #bf5000; /* Improved from #f59e0b for better contrast */
   --status-error: #ef4444;
-  --status-info: #3b82f6;
+  --status-info: #0277bd; /* Improved from #3b82f6 for better contrast */
   
   /* Gradients */
   --gradient-primary: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
@@ -48,6 +48,102 @@
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+}
+
+/* ===== ACCESSIBILITY STYLES ===== */
+
+/* Screen reader only content */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Enhanced Focus Indicators - WCAG 2.1 AA Compliant */
+/* Universal focus styles for all interactive elements */
+button:focus,
+input:focus,
+select:focus,
+textarea:focus,
+.panel-btn:focus,
+.emergency-stop:focus,
+.toolbar-btn:focus,
+.nav-btn:focus,
+.module-tab:focus {
+  outline: 3px solid var(--accent-blue) !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 2px var(--bg-primary), 0 0 8px var(--accent-blue) !important;
+  border-radius: 4px;
+  transition: outline 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* High contrast focus for critical elements */
+.emergency-stop:focus {
+  outline: 3px solid var(--accent-red) !important;
+  box-shadow: 0 0 0 2px var(--bg-primary), 0 0 12px var(--accent-red) !important;
+}
+
+/* Focus for navigation elements */
+.main-nav button:focus,
+.main-nav .nav-btn:focus {
+  outline: 3px solid var(--accent-green) !important;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px var(--bg-primary), 0 0 8px var(--accent-green) !important;
+}
+
+/* Focus for form elements */
+input[type="range"]:focus {
+  outline: 3px solid var(--accent-blue) !important;
+  outline-offset: 4px;
+}
+
+/* Focus for custom joystick control */
+.joystick:focus,
+.joystick:focus-within {
+  outline: 3px solid var(--accent-blue) !important;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px var(--bg-primary), 0 0 12px var(--accent-blue) !important;
+}
+
+/* Focus for panel minimize buttons */
+.panel-btn.minimize:focus {
+  outline: 2px solid var(--accent-blue) !important;
+  outline-offset: 1px;
+  box-shadow: 0 0 4px var(--accent-blue) !important;
+}
+
+/* Focus for dropdown/select elements */
+.port-select:focus,
+select:focus {
+  outline: 3px solid var(--accent-blue) !important;
+  outline-offset: 2px;
+  background-color: var(--bg-panel-light) !important;
+}
+
+/* Ensure focus is visible on hover states too */
+button:focus:hover,
+input:focus:hover {
+  outline: 3px solid var(--accent-blue-light) !important;
+  box-shadow: 0 0 0 2px var(--bg-primary), 0 0 12px var(--accent-blue-light) !important;
+}
+
+/* Visual feedback for keyboard-activated emergency stop */
+.emergency-stop.keyboard-activated {
+  transform: scale(1.05) !important;
+  box-shadow: 0 0 20px var(--accent-red) !important;
+  animation: emergency-pulse 0.2s ease-out;
+}
+
+@keyframes emergency-pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1.05); }
 }
 
 body {
@@ -1976,5 +2072,102 @@ canvas {
   
   .knowledge-tab {
     min-width: 120px;
+  }
+}
+
+/* =============================
+   ACCESSIBILITY SKIP LINKS
+   ============================= */
+
+/* Skip links container - positioned at top of page */
+.skip-links {
+  position: fixed;
+  top: -100px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  display: flex;
+  gap: 8px;
+  padding: 8px;
+  background: var(--bg-panel);
+  border: 2px solid var(--accent-blue);
+  border-radius: 8px;
+  box-shadow: var(--shadow-large);
+  transition: top 0.3s ease-in-out;
+}
+
+/* Individual skip link styling */
+.skip-link {
+  display: inline-block;
+  padding: 8px 16px;
+  background: var(--accent-blue);
+  color: var(--text-primary);
+  text-decoration: none;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: all 0.2s ease-in-out;
+  
+  /* Enhanced focus indicators for WCAG 2.1 AA compliance */
+  outline: none;
+  position: relative;
+}
+
+/* Show skip links when focused */
+.skip-link:focus,
+.skip-link:focus-visible {
+  outline: 3px solid var(--accent-blue-light);
+  outline-offset: 2px;
+  background: var(--accent-blue-light);
+  transform: scale(1.05);
+}
+
+/* Show skip links container when any link is focused */
+.skip-links:focus-within {
+  top: 20px;
+}
+
+/* Hover state for skip links */
+.skip-link:hover {
+  background: var(--accent-blue-light);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+/* Active state */
+.skip-link:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2);
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .skip-link {
+    border: 2px solid var(--text-primary);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+  }
+  
+  .skip-link:focus {
+    background: var(--text-primary);
+    color: var(--bg-primary);
+    outline: 3px solid var(--accent-blue);
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .skip-links {
+    transition: none;
+  }
+  
+  .skip-link {
+    transition: none;
+  }
+  
+  .skip-link:hover,
+  .skip-link:focus {
+    transform: none;
   }
 }

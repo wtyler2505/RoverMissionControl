@@ -24,6 +24,10 @@ import queue
 import math
 import logging
 from contextlib import asynccontextmanager
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -41,7 +45,7 @@ app.add_middleware(
 )
 
 # Claude API configuration - More secure approach
-CLAUDE_API_KEY = os.getenv("CLAUDE_API_KEY", "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")
+CLAUDE_API_KEY = os.getenv("CLAUDE_API_KEY")
 CLAUDE_API_URL = "https://api.anthropic.com/v1/messages"
 
 # Directories
@@ -1901,8 +1905,9 @@ async def save_configuration(config: dict):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Config save error: {str(e)}")
 
-# Set environment variable
-os.environ["CLAUDE_API_KEY"] = CLAUDE_API_KEY
+# Set environment variable only if it exists
+if CLAUDE_API_KEY:
+    os.environ["CLAUDE_API_KEY"] = CLAUDE_API_KEY
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8001)
