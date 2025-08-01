@@ -1,0 +1,51 @@
+{
+  "timestamp": "2025-07-21T15:39:32.018Z",
+  "summary": {
+    "total": 10,
+    "passed": 9,
+    "failed": 1
+  },
+  "tests": [
+    {
+      "name": "Backend API Health Check",
+      "status": "passed"
+    },
+    {
+      "name": "Backend API Documentation",
+      "status": "passed"
+    },
+    {
+      "name": "Frontend Application Load",
+      "status": "passed"
+    },
+    {
+      "name": "3D Rover Visualization",
+      "status": "passed"
+    },
+    {
+      "name": "WebSocket Telemetry Connection",
+      "status": "passed"
+    },
+    {
+      "name": "Rover Control Interface",
+      "status": "passed"
+    },
+    {
+      "name": "Responsive Design - Tablet",
+      "status": "passed"
+    },
+    {
+      "name": "Responsive Design - Mobile",
+      "status": "passed"
+    },
+    {
+      "name": "Error Handling - Invalid API Call",
+      "status": "passed"
+    },
+    {
+      "name": "Performance Metrics",
+      "status": "failed",
+      "error": "page.goto: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - navigating to \"http://localhost:3000/\", waiting until \"networkidle\"\u001b[22m\n"
+    }
+  ]
+}
