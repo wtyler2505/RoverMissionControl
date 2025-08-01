@@ -1,0 +1,254 @@
+/* Loading Skeleton Styles */
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.loading-skeleton {
+  padding: 1rem;
+  background: var(--bg-primary, #1a1a1a);
+  color: var(--text-primary, #ffffff);
+  min-height: 400px;
+}
+
+.skeleton-line,
+.skeleton-box {
+  background: linear-gradient(
+    90deg,
+    var(--bg-secondary, #2a2a2a) 25%,
+    var(--bg-tertiary, #3a3a3a) 50%,
+    var(--bg-secondary, #2a2a2a) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 4px;
+  margin-bottom: 0.5rem;
+}
+
+.skeleton-line {
+  height: 1rem;
+}
+
+.skeleton-box {
+  height: 200px;
+}
+
+/* Dashboard Skeleton Styles */
+.dashboard-skeleton .skeleton-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.dashboard-skeleton .skeleton-panel {
+  background: var(--bg-secondary, #2a2a2a);
+  border-radius: 8px;
+  padding: 1rem;
+  border: 1px solid var(--border-color, #444);
+}
+
+.dashboard-skeleton .panel-title {
+  margin-bottom: 1rem;
+}
+
+.dashboard-skeleton .control-skeleton {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.dashboard-skeleton .gauges-skeleton {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+}
+
+.dashboard-skeleton .gauge-skeleton {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.dashboard-skeleton .gauge-circle {
+  border-radius: 50%;
+}
+
+/* IDE Skeleton Styles */
+.ide-skeleton .skeleton-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  grid-template-rows: auto auto;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.ide-skeleton .editor-panel {
+  grid-column: 1;
+  grid-row: 1 / 3;
+}
+
+.ide-skeleton .editor-toolbar-skeleton {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.ide-skeleton .library-skeleton,
+.ide-skeleton .library-item-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.ide-skeleton .library-item-skeleton {
+  padding: 0.5rem;
+  background: var(--bg-tertiary, #3a3a3a);
+  border-radius: 4px;
+}
+
+/* AI Assistant Skeleton Styles */
+.ai-skeleton .ai-chat-skeleton {
+  display: flex;
+  flex-direction: column;
+  height: 500px;
+}
+
+.ai-skeleton .context-skeleton {
+  background: var(--bg-secondary, #2a2a2a);
+  padding: 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
+.ai-skeleton .context-item {
+  margin-bottom: 0.5rem;
+}
+
+.ai-skeleton .chat-messages-skeleton {
+  flex: 1;
+  background: var(--bg-secondary, #2a2a2a);
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.ai-skeleton .chat-input-skeleton {
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* Project Skeleton Styles */
+.project-skeleton .kanban-skeleton {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+
+.project-skeleton .kanban-column-skeleton {
+  background: var(--bg-secondary, #2a2a2a);
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.project-skeleton .column-header {
+  margin-bottom: 1rem;
+  font-weight: bold;
+}
+
+.project-skeleton .task-card {
+  margin-bottom: 0.5rem;
+  border-radius: 4px;
+}
+
+.project-skeleton .inventory-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.project-skeleton .inventory-item-skeleton {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem;
+  background: var(--bg-secondary, #2a2a2a);
+  border-radius: 4px;
+}
+
+/* Knowledge Skeleton Styles */
+.knowledge-skeleton .knowledge-nav-skeleton {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.knowledge-skeleton .nav-tab {
+  border-radius: 6px;
+}
+
+.knowledge-skeleton .knowledge-content-skeleton {
+  background: var(--bg-secondary, #2a2a2a);
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+/* Generic Skeleton Styles */
+.generic-skeleton .skeleton-content {
+  margin-top: 1rem;
+}
+
+.generic-skeleton .skeleton-rows {
+  margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .dashboard-skeleton .skeleton-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .ide-skeleton .skeleton-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .project-skeleton .kanban-skeleton {
+    grid-template-columns: 1fr;
+  }
+  
+  .knowledge-skeleton .knowledge-nav-skeleton {
+    flex-wrap: wrap;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .skeleton-line,
+  .skeleton-box {
+    background: linear-gradient(
+      90deg,
+      #333 25%,
+      #555 50%,
+      #333 75%
+    );
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-line,
+  .skeleton-box {
+    animation: none;
+    opacity: 0.7;
+  }
+}

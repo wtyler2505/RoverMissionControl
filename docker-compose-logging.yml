@@ -1,0 +1,216 @@
+version: '3.8'
+
+services:
+  # Frontend with logging
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: rover-mission-control-frontend:latest
+    container_name: rmc-frontend
+    ports:
+      - "3000:80"
+    environment:
+      - REACT_APP_API_URL=http://backend:8000
+      - REACT_APP_WS_URL=ws://backend:8000
+      - REACT_APP_LOG_ENDPOINT=http://backend:8000/api/logs
+      - REACT_APP_FLUENTD_ENDPOINT=http://fluentd:9880
+      - REACT_APP_LOG_LEVEL=DEBUG
+    depends_on:
+      - backend
+      - fluentd
+    networks:
+      - rover-network
+    logging:
+      driver: "fluentd"
+      options:
+        fluentd-address: "localhost:24224"
+        tag: "frontend.{{.ID}}"
+        fluentd-async-connect: "true"
+    labels:
+      - "com.rover.service=frontend"
+      - "com.rover.environment=development"
+
+  # Backend with logging
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: rover-mission-control-backend:latest
+    container_name: rmc-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=sqlite:///./data/rover_platform.db
+      - CORS_ORIGINS=http://localhost:3000,http://frontend
+      - SECRET_KEY=${SECRET_KEY:-your-secret-key-here}
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+      - FLUENTD_HOST=fluentd
+      - FLUENTD_PORT=24224
+      - LOG_DIR=/app/logs
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    networks:
+      - rover-network
+    logging:
+      driver: "fluentd"
+      options:
+        fluentd-address: "localhost:24224"
+        tag: "backend.{{.ID}}"
+        fluentd-async-connect: "true"
+    labels:
+      - "com.rover.service=backend"
+      - "com.rover.environment=development"
+
+  # Elasticsearch for log storage
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: rmc-elasticsearch
+    environment:
+      - node.name=es01
+      - cluster.name=rover-mission-control-dev
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - xpack.security.enabled=false
+      - xpack.security.enrollment.enabled=false
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+      - ./logging/elasticsearch/ilm-policy.json:/usr/share/elasticsearch/config/ilm-policy.json:ro
+    ports:
+      - "9200:9200"
+    networks:
+      - rover-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Kibana for visualization
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.11.0
+    container_name: rmc-kibana
+    environment:
+      - SERVERNAME=kibana
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - XPACK_SECURITY_ENABLED=false
+    ports:
+      - "5601:5601"
+    networks:
+      - rover-network
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    volumes:
+      - ./logging/kibana/dashboards:/usr/share/kibana/data/dashboards:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5601/api/status || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Fluentd for log collection
+  fluentd:
+    build: 
+      context: ./logging/fluentd
+      dockerfile: Dockerfile
+    container_name: rmc-fluentd
+    volumes:
+      - ./logging/fluentd/conf:/fluentd/etc
+      - fluentd-log:/fluentd/log
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    ports:
+      - "24224:24224"
+      - "24224:24224/udp"
+      - "9880:9880"
+    networks:
+      - rover-network
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    environment:
+      - FLUENTD_CONF=fluent.conf
+
+  # Redis for log buffering and alerts
+  redis:
+    image: redis:7-alpine
+    container_name: rmc-log-cache
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - rover-network
+    command: redis-server --appendonly yes
+
+  # Development helper - log viewer
+  dozzle:
+    image: amir20/dozzle:latest
+    container_name: rmc-log-viewer
+    ports:
+      - "8080:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - rover-network
+    environment:
+      - DOZZLE_LEVEL=debug
+      - DOZZLE_TAILSIZE=300
+      - DOZZLE_FILTER=label=com.rover.*
+
+  # Prometheus for metrics (optional)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: rmc-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./logging/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    networks:
+      - rover-network
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+
+  # Grafana for metrics visualization (optional)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: rmc-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./logging/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./logging/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    networks:
+      - rover-network
+    depends_on:
+      - prometheus
+      - elasticsearch
+
+networks:
+  rover-network:
+    driver: bridge
+
+volumes:
+  elasticsearch-data:
+    driver: local
+  fluentd-log:
+    driver: local
+  redis-data:
+    driver: local
+  prometheus-data:
+    driver: local
+  grafana-data:
+    driver: local

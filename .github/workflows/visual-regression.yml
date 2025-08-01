@@ -1,0 +1,496 @@
+name: Visual Regression Testing
+
+on:
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'frontend/src/**'
+      - 'stories/**'
+      - '.storybook/**'
+      - 'tests/e2e/visual/**'
+      - 'package*.json'
+      - 'yarn.lock'
+  workflow_dispatch:
+    inputs:
+      update_baselines:
+        description: 'Update visual baselines'
+        required: false
+        default: 'false'
+        type: boolean
+
+env:
+  NODE_VERSION: '18'
+  PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/ms-playwright
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Job 1: Jest Visual Testing
+  jest-visual:
+    name: Jest Visual Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          cd frontend && npm ci
+
+      - name: Cache Jest snapshots
+        uses: actions/cache@v4
+        with:
+          path: |
+            frontend/src/**/__image_snapshots__
+          key: jest-snapshots-${{ runner.os }}-${{ hashFiles('frontend/src/**/*.visual.test.*') }}
+          restore-keys: |
+            jest-snapshots-${{ runner.os }}-
+
+      - name: Run Jest visual tests
+        run: |
+          cd frontend
+          npm run test:visual -- --coverage --ci --passWithNoTests
+        env:
+          CI: true
+          UPDATE_SNAPSHOTS: ${{ github.event.inputs.update_baselines }}
+
+      - name: Upload Jest visual test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: jest-visual-results
+          path: |
+            frontend/coverage/
+            frontend/src/**/__image_snapshots__/__diff_output__/
+          retention-days: 7
+
+      - name: Comment PR with Jest results
+        if: github.event_name == 'pull_request' && failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            
+            // Find diff images
+            const diffDir = path.join(process.cwd(), 'frontend/src');
+            const diffImages = [];
+            
+            function findDiffs(dir) {
+              try {
+                const files = fs.readdirSync(dir);
+                for (const file of files) {
+                  const filePath = path.join(dir, file);
+                  if (fs.statSync(filePath).isDirectory()) {
+                    if (file === '__diff_output__') {
+                      const diffFiles = fs.readdirSync(filePath);
+                      diffImages.push(...diffFiles.map(f => path.join(filePath, f)));
+                    } else {
+                      findDiffs(filePath);
+                    }
+                  }
+                }
+              } catch (error) {
+                console.log('Error reading directory:', error.message);
+              }
+            }
+            
+            findDiffs(diffDir);
+            
+            const comment = `## 📸 Jest Visual Regression Results
+            
+            ${diffImages.length > 0 ? 
+              `❌ **${diffImages.length} visual differences detected**
+              
+              <details>
+              <summary>View diff files</summary>
+              
+              ${diffImages.map(img => `- \`${img}\``).join('\n')}
+              
+              </details>
+              
+              Please review the visual changes and update baselines if intended.` :
+              '✅ **No visual differences detected**'
+            }
+            
+            ---
+            *Visual regression testing powered by Jest Image Snapshot*`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+  # Job 2: Playwright Visual Testing
+  playwright-visual:
+    name: Playwright Visual Tests
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        browser: [chromium, firefox, webkit]
+        
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: |
+          npx playwright install ${{ matrix.browser }} --with-deps
+          npx playwright install-deps
+
+      - name: Cache Playwright snapshots
+        uses: actions/cache@v4
+        with:
+          path: |
+            tests/e2e/snapshots
+          key: playwright-snapshots-${{ matrix.browser }}-${{ runner.os }}-${{ hashFiles('tests/e2e/visual/**/*.spec.ts') }}
+          restore-keys: |
+            playwright-snapshots-${{ matrix.browser }}-${{ runner.os }}-
+
+      - name: Start backend server
+        run: |
+          cd backend
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          python server.py --test-mode &
+          sleep 10
+        env:
+          ENVIRONMENT: test
+          DATABASE_URL: sqlite:///test_rover_platform.db
+
+      - name: Start frontend server
+        run: |
+          cd frontend
+          npm start &
+          sleep 30
+        env:
+          NODE_ENV: test
+          REACT_APP_API_URL: http://localhost:8000
+          REACT_APP_WS_URL: ws://localhost:8000
+
+      - name: Run Playwright visual tests
+        run: |
+          npx playwright test --project=${{ matrix.browser }} tests/e2e/visual/
+        env:
+          CI: true
+          UPDATE_SNAPSHOTS: ${{ github.event.inputs.update_baselines }}
+
+      - name: Upload Playwright test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-results-${{ matrix.browser }}
+          path: |
+            playwright-report/
+            test-results/
+            tests/e2e/snapshots/
+          retention-days: 7
+
+  # Job 3: Chromatic Visual Testing
+  chromatic-visual:
+    name: Chromatic Visual Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Storybook
+        run: npm run build-storybook
+
+      - name: Run Chromatic
+        uses: chromaui/action@v1
+        with:
+          projectToken: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          buildScriptName: 'build-storybook'
+          exitZeroOnChanges: false
+          exitOnceUploaded: true
+          onlyChanged: true
+          externals: |
+            - 'packages/design-tokens/dist/**'
+          ignoreLastBuildOnBranch: 'main'
+
+  # Job 4: Cross-Browser Comparison
+  cross-browser-comparison:
+    name: Cross-Browser Visual Comparison
+    runs-on: ubuntu-latest
+    needs: [playwright-visual]
+    if: always() && (needs.playwright-visual.result == 'success' || needs.playwright-visual.result == 'failure')
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download Playwright results
+        uses: actions/download-artifact@v4
+        with:
+          pattern: playwright-results-*
+          merge-multiple: true
+          path: ./playwright-results
+
+      - name: Compare cross-browser results
+        run: |
+          node tools/visual-baseline-manager.js compare playwright
+        continue-on-error: true
+
+      - name: Upload comparison results
+        uses: actions/upload-artifact@v4
+        with:
+          name: cross-browser-comparison
+          path: .visual-baselines/comparison-*.json
+          retention-days: 7
+
+  # Job 5: Visual Regression Report
+  visual-report:
+    name: Generate Visual Regression Report
+    runs-on: ubuntu-latest
+    needs: [jest-visual, playwright-visual, chromatic-visual, cross-browser-comparison]
+    if: always() && github.event_name == 'pull_request'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download all test results
+        uses: actions/download-artifact@v4
+        with:
+          path: ./test-results
+
+      - name: Generate visual regression report
+        run: |
+          node tools/generate-visual-report.js
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.number }}
+
+      - name: Upload comprehensive report
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-regression-report
+          path: |
+            visual-regression-report.html
+            visual-regression-report.json
+          retention-days: 30
+
+      - name: Comment PR with comprehensive results
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            
+            // Read report data
+            let reportData = {};
+            try {
+              reportData = JSON.parse(fs.readFileSync('visual-regression-report.json', 'utf8'));
+            } catch (error) {
+              console.log('No report data found');
+              return;
+            }
+            
+            const { jest, playwright, chromatic, crossBrowser } = reportData;
+            
+            const comment = `## 🎭 Visual Regression Testing Results
+            
+            ### 📸 Jest Visual Tests
+            ${jest.status === 'success' ? 
+              `✅ **Passed** - ${jest.tests} tests, no visual differences` :
+              `❌ **Failed** - ${jest.differences} visual differences found`
+            }
+            
+            ### 🎭 Playwright Visual Tests
+            ${Object.entries(playwright.browsers).map(([browser, result]) => 
+              `- **${browser}**: ${result.status === 'success' ? '✅ Passed' : '❌ Failed'} (${result.tests} tests)`
+            ).join('\n')}
+            
+            ### 🎨 Chromatic Visual Tests
+            ${chromatic.status === 'success' ? 
+              `✅ **Passed** - [View build](${chromatic.buildUrl})` :
+              `❌ **Changes detected** - [Review changes](${chromatic.buildUrl})`
+            }
+            
+            ### 🔄 Cross-Browser Consistency
+            ${crossBrowser.differences === 0 ? 
+              '✅ **Consistent** - No differences between browsers' :
+              `⚠️ **${crossBrowser.differences} inconsistencies** found between browsers`
+            }
+            
+            ---
+            
+            ${reportData.summary.status === 'success' ? 
+              '### ✅ All Visual Tests Passed\nNo visual regressions detected. Safe to merge!' :
+              '### ⚠️ Visual Changes Detected\nPlease review the visual changes above. If these changes are intentional, update the baselines by re-running the workflow with "Update visual baselines" checked.'
+            }
+            
+            <details>
+            <summary>📊 Detailed Report</summary>
+            
+            **Test Coverage:**
+            - Components tested: ${reportData.summary.components}
+            - Total screenshots: ${reportData.summary.screenshots}
+            - Themes tested: ${reportData.summary.themes.join(', ')}
+            - Viewports tested: ${reportData.summary.viewports.join(', ')}
+            
+            **Performance:**
+            - Total test time: ${reportData.summary.duration}
+            - Average test time: ${reportData.summary.averageTestTime}
+            
+            [📄 View full report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            
+            </details>
+            
+            ---
+            *Visual regression testing powered by Jest, Playwright, and Chromatic*`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+  # Job 6: Update Baselines (only on manual trigger)
+  update-baselines:
+    name: Update Visual Baselines
+    runs-on: ubuntu-latest
+    if: github.event.inputs.update_baselines == 'true'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+
+      - name: Update all baselines
+        run: node tools/visual-baseline-manager.js update
+
+      - name: Commit updated baselines
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add .
+          if ! git diff --staged --quiet; then
+            git commit -m "chore: update visual regression baselines [skip ci]"
+            git push
+          else
+            echo "No baseline changes to commit"
+          fi
+
+  # Job 7: Cleanup old artifacts
+  cleanup:
+    name: Cleanup Old Visual Artifacts
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event.inputs.cleanup == 'true'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Cleanup old baselines
+        run: node tools/visual-baseline-manager.js cleanup
+
+      - name: Cleanup old workflow artifacts
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: artifacts } = await github.rest.actions.listArtifactsForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 100
+            });
+            
+            const cutoffDate = new Date();
+            cutoffDate.setDate(cutoffDate.getDate() - 7); // Keep artifacts for 7 days
+            
+            for (const artifact of artifacts.artifacts) {
+              const createdAt = new Date(artifact.created_at);
+              if (createdAt < cutoffDate && artifact.name.includes('visual')) {
+                try {
+                  await github.rest.actions.deleteArtifact({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    artifact_id: artifact.id
+                  });
+                  console.log(`Deleted artifact: ${artifact.name}`);
+                } catch (error) {
+                  console.log(`Failed to delete artifact ${artifact.name}: ${error.message}`);
+                }
+              }
+            }

@@ -1,0 +1,122 @@
+# Chromatic Visual Testing Workflow
+name: 'Chromatic'
+
+# Event triggers for the workflow
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+# Ensure only one Chromatic build runs at a time per branch
+concurrency:
+  group: chromatic-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  chromatic-deployment:
+    name: Visual Testing & Deployment
+    runs-on: ubuntu-latest
+    
+    # Skip workflow if commit message contains [skip ci] or [skip chromatic]
+    if: "!contains(github.event.head_commit.message, '[skip ci]') && !contains(github.event.head_commit.message, '[skip chromatic]')"
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # Fetch full git history for Chromatic baseline detection
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          # Build design tokens first as they're required
+          cd packages/design-tokens && npm run build && cd ../..
+
+      - name: Run Chromatic
+        uses: chromaui/action@v1
+        with:
+          # Chromatic project token (set in repository secrets)
+          projectToken: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
+          
+          # Build Storybook and upload to Chromatic
+          buildScriptName: build-storybook
+          
+          # Exit with 0 exit code even if there are visual changes
+          exitZeroOnChanges: true
+          
+          # Only run Chromatic on changed files to optimize build time
+          onlyChanged: true
+          
+          # Auto-accept changes on main branch (optional)
+          autoAcceptChanges: ${{ github.ref == 'refs/heads/main' }}
+          
+          # Skip Chromatic on dependabot PRs
+          skip: 'dependabot/**'
+          
+          # Enable file hashing for better caching
+          fileHashing: true
+          
+          # Compress uploads for faster transfer
+          zip: true
+
+      - name: Comment PR with Chromatic results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const chromaticUrl = process.env.CHROMATIC_BUILD_URL;
+            if (chromaticUrl) {
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: `🎨 **Chromatic Visual Testing**
+                
+                View the visual changes and approve them in Chromatic:
+                👀 [View Chromatic Build](${chromaticUrl})
+                
+                **What is Chromatic?**
+                Chromatic automatically detects visual changes in your UI components and requires approval before merging. This ensures visual consistency and prevents UI regressions.`
+              });
+            }
+
+  # Separate job for Storybook build verification
+  storybook-build:
+    name: Verify Storybook Build
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          cd packages/design-tokens && npm run build && cd ../..
+
+      - name: Build Storybook
+        run: npm run build-storybook
+
+      - name: Upload Storybook build artifacts
+        uses: actions/upload-artifact@v3
+        if: failure()
+        with:
+          name: storybook-build-logs
+          path: |
+            storybook.log
+            npm-debug.log*
+          retention-days: 7

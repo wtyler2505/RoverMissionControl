@@ -1,0 +1,83 @@
+{
+  "recording_id": "recording_1753686401",
+  "start_time": "2025-07-28T02:06:41.630918",
+  "end_time": "2025-07-28T02:06:45.161835",
+  "events": [
+    {
+      "timestamp": "2025-07-28T02:06:41.631423",
+      "event_type": "simulation_started",
+      "source": "simulation_engine",
+      "data": {
+        "mode": "realtime",
+        "time_acceleration": 1.0
+      },
+      "metadata": {
+        "simulation_time": 0.0,
+        "mode": "realtime"
+      }
+    },
+    {
+      "timestamp": "2025-07-28T02:06:42.662565",
+      "event_type": "device_added",
+      "source": "simulation_engine",
+      "data": {
+        "device_id": "sim_device_1",
+        "device_type": "sensor",
+        "name": "Temperature Sensor"
+      },
+      "metadata": {
+        "simulation_time": 0.6600000000000003,
+        "mode": "realtime"
+      }
+    },
+    {
+      "timestamp": "2025-07-28T02:06:43.176966",
+      "event_type": "device_added",
+      "source": "simulation_engine",
+      "data": {
+        "device_id": "sim_device_2",
+        "device_type": "sensor",
+        "name": "6-DOF IMU"
+      },
+      "metadata": {
+        "simulation_time": 1.0000000000000004,
+        "mode": "realtime"
+      }
+    },
+    {
+      "timestamp": "2025-07-28T02:06:44.956878",
+      "event_type": "device_state_changed",
+      "source": "simulation_engine",
+      "data": {
+        "device_id": "sim_device_1",
+        "state": {
+          "calibration_offset": 0.5
+        }
+      },
+      "metadata": {
+        "simulation_time": 2.1400000000000015,
+        "mode": "realtime"
+      }
+    },
+    {
+      "timestamp": "2025-07-28T02:06:45.160818",
+      "event_type": "device_removed",
+      "source": "simulation_engine",
+      "data": {
+        "device_id": "sim_device_1"
+      },
+      "metadata": {
+        "simulation_time": 2.2800000000000016,
+        "mode": "realtime"
+      }
+    }
+  ],
+  "metadata": {
+    "config": {
+      "simulation_rate": 50.0,
+      "time_acceleration": 1.0,
+      "physics_enabled": true,
+      "network_enabled": true
+    }
+  }
+}

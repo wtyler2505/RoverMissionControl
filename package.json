@@ -1,0 +1,131 @@
+{
+  "name": "rover-mission-control",
+  "version": "1.0.0",
+  "description": "Enterprise-grade rover mission control system with professional UI/UX and real-time telemetry",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "keywords": [
+    "rover",
+    "mission-control",
+    "telemetry",
+    "3d-visualization",
+    "enterprise",
+    "monorepo"
+  ],
+  "author": "RoverMissionControl Team",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:frontend": "cd apps/frontend && npm run start",
+    "dev:backend": "cd apps/backend && python server.py",
+    "build": "npm run build:frontend && npm run build:backend",
+    "build:frontend": "cd apps/frontend && npm run build",
+    "build:backend": "echo 'Backend build - Python packaging TBD'",
+    "test": "npm run test:frontend && npm run test:backend && npm run test:e2e",
+    "test:frontend": "cd apps/frontend && npm run test",
+    "test:backend": "cd backend && python -m pytest",
+    "test:e2e": "npx playwright test",
+    "test:e2e:ui": "npx playwright test --ui",
+    "test:e2e:debug": "npx playwright test --debug",
+    "test:e2e:headed": "npx playwright test --headed",
+    "test:e2e:chromium": "npx playwright test --project=chromium",
+    "test:e2e:firefox": "npx playwright test --project=firefox",
+    "test:e2e:webkit": "npx playwright test --project=webkit",
+    "test:e2e:api": "npx playwright test --project=api",
+    "test:e2e:visual": "npx playwright test --project=visual",
+    "test:e2e:performance": "npx playwright test --project=performance",
+    "test:e2e:accessibility": "npx playwright test --project=accessibility",
+    "test:e2e:mobile": "npx playwright test --project=mobile-chrome --project=mobile-safari",
+    "test:e2e:update-snapshots": "npx playwright test --project=visual --update-snapshots",
+    "test:e2e:report": "npx playwright show-report",
+    "test:e2e:install": "npx playwright install",
+    "test:visual": "npm run test:visual:jest && npm run test:visual:playwright && npm run test:visual:chromatic",
+    "test:visual:jest": "cd frontend && npm run test:visual",
+    "test:visual:playwright": "npx playwright test tests/e2e/visual/",
+    "test:visual:chromatic": "npm run chromatic",
+    "test:visual:update": "npm run test:visual:jest -- --updateSnapshot && npm run test:visual:playwright -- --update-snapshots",
+    "test:visual:report": "node tools/generate-visual-report.js",
+    "visual:baseline:init": "node tools/visual-baseline-manager.js init",
+    "visual:baseline:update": "node tools/visual-baseline-manager.js update",
+    "visual:baseline:cleanup": "node tools/visual-baseline-manager.js cleanup",
+    "visual:baseline:compare": "node tools/visual-baseline-manager.js compare",
+    "visual:baseline:stats": "node tools/visual-baseline-manager.js stats",
+    "visual:baseline:validate": "node tools/visual-baseline-manager.js validate",
+    "test:a11y": "npm run test:a11y:jest && npm run test:a11y:playwright && npm run test:a11y:lighthouse",
+    "test:a11y:jest": "cd frontend && npm run test:a11y",
+    "test:a11y:playwright": "npx playwright test --project=accessibility",
+    "test:a11y:lighthouse": "lhci autorun",
+    "test:a11y:axe": "axe http://localhost:3000 --exit --save axe-results.json --tags wcag2a,wcag2aa,wcag21aa",
+    "test:a11y:screen-reader": "node tools/screen-reader-testing.js",
+    "test:a11y:color-contrast": "node tools/color-contrast-validator.js",
+    "test:a11y:report": "node tools/generate-a11y-report.js",
+    "lint": "npm run lint:frontend && npm run lint:backend",
+    "lint:frontend": "cd apps/frontend && npm run lint",
+    "lint:backend": "cd backend && python -m flake8 .",
+    "format": "npm run format:frontend && npm run format:backend",
+    "format:frontend": "cd apps/frontend && npm run format",
+    "format:backend": "cd backend && python -m black .",
+    "clean": "npm run clean:deps && npm run clean:build",
+    "clean:deps": "rm -rf node_modules apps/*/node_modules packages/*/node_modules",
+    "clean:build": "rm -rf apps/*/build apps/*/dist packages/*/dist",
+    "setup": "npm install && npm run setup:backend && npm run setup:frontend",
+    "setup:backend": "cd backend && pip install -r requirements.txt",
+    "setup:frontend": "cd apps/frontend && npm install",
+    "docker:build": "docker-compose build",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docs:serve": "npx serve docs -p 3001",
+    "prepare": "husky install",
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build",
+    "chromatic": "chromatic --exit-zero-on-changes",
+    "chromatic:ci": "chromatic --exit-zero-on-changes --build-script-name=build-storybook"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.40.0",
+    "@storybook/addon-a11y": "^9.0.17",
+    "@storybook/addon-docs": "^9.0.17",
+    "@storybook/addon-links": "^9.0.17",
+    "@storybook/addon-onboarding": "^9.0.17",
+    "@storybook/addon-themes": "^9.0.17",
+    "@storybook/addon-webpack5-compiler-swc": "^3.0.0",
+    "@storybook/blocks": "^8.6.14",
+    "@storybook/react-webpack5": "^9.0.17",
+    "chromatic": "^13.1.2",
+    "concurrently": "^8.2.2",
+    "eslint-plugin-storybook": "^9.0.17",
+    "husky": "^8.0.3",
+    "lint-staged": "^15.2.0",
+    "prettier": "^3.1.0",
+    "storybook": "^9.0.17",
+    "typescript": "^5.3.0"
+  },
+  "dependencies": {
+    "dotenv": "^16.3.1"
+  },
+  "lint-staged": {
+    "apps/frontend/**/*.{js,jsx,ts,tsx}": [
+      "prettier --write",
+      "eslint --fix"
+    ],
+    "packages/**/*.{js,jsx,ts,tsx}": [
+      "prettier --write",
+      "eslint --fix"
+    ],
+    "backend/**/*.py": [
+      "black",
+      "flake8"
+    ],
+    "*.{json,md,yml,yaml}": [
+      "prettier --write"
+    ]
+  },
+  "packageManager": "npm@9.8.1"
+}

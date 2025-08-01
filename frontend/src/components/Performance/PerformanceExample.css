@@ -1,0 +1,259 @@
+/* Performance Example Styles */
+
+.performance-example {
+  padding: 20px;
+  max-width: 800px;
+  margin: 0 auto;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.example-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+  padding-bottom: 15px;
+  border-bottom: 2px solid #e9ecef;
+}
+
+.example-header h2 {
+  margin: 0;
+  color: #343a40;
+}
+
+.example-controls {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.example-controls label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #6c757d;
+  cursor: pointer;
+}
+
+.example-controls input[type="checkbox"] {
+  margin: 0;
+}
+
+.example-content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 30px;
+  align-items: start;
+}
+
+/* Telemetry Simulator Styles */
+.telemetry-simulator {
+  background: #ffffff;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.telemetry-simulator h3 {
+  margin: 0 0 20px 0;
+  color: #495057;
+  font-size: 18px;
+}
+
+.simulator-controls {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.process-button {
+  background: #007bff;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.process-button:hover:not(:disabled) {
+  background: #0056b3;
+  transform: translateY(-1px);
+}
+
+.process-button:disabled {
+  background: #6c757d;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.data-info {
+  font-size: 14px;
+  color: #6c757d;
+  font-weight: 500;
+}
+
+.data-visualization {
+  border-radius: 5px;
+  overflow: hidden;
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+}
+
+.data-chart {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* Info Section Styles */
+.example-info {
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.example-info h4 {
+  margin: 0 0 15px 0;
+  color: #495057;
+  font-size: 16px;
+}
+
+.example-info ul,
+.example-info ol {
+  margin: 0 0 20px 0;
+  padding-left: 20px;
+}
+
+.example-info li {
+  margin-bottom: 8px;
+  font-size: 14px;
+  color: #6c757d;
+  line-height: 1.5;
+}
+
+.example-info ul li {
+  list-style-type: disc;
+}
+
+.example-info ol li {
+  list-style-type: decimal;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .performance-example {
+    padding: 15px;
+  }
+  
+  .example-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 15px;
+  }
+  
+  .example-content {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+  
+  .simulator-controls {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+}
+
+/* Animation for data processing */
+@keyframes processingPulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+.process-button:disabled {
+  animation: processingPulse 2s ease-in-out infinite;
+}
+
+/* Data visualization effects */
+.data-chart circle {
+  transition: all 0.3s ease;
+}
+
+.data-chart circle:hover {
+  r: 3;
+  fill: #dc3545;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .telemetry-simulator,
+  .example-info {
+    border: 2px solid;
+  }
+  
+  .process-button {
+    border: 1px solid;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .process-button {
+    transition: none;
+  }
+  
+  .process-button:hover:not(:disabled) {
+    transform: none;
+  }
+  
+  .data-chart circle {
+    transition: none;
+  }
+  
+  .process-button:disabled {
+    animation: none;
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .performance-example {
+    background-color: #121212;
+    color: #ffffff;
+  }
+  
+  .example-header {
+    border-bottom-color: #333333;
+  }
+  
+  .example-header h2 {
+    color: #ffffff;
+  }
+  
+  .telemetry-simulator,
+  .example-info {
+    background: #1e1e1e;
+    border-color: #333333;
+    color: #ffffff;
+  }
+  
+  .data-visualization {
+    background: #2d2d30;
+    border-color: #333333;
+  }
+  
+  .data-chart rect {
+    fill: #2d2d30;
+    stroke: #333333;
+  }
+}

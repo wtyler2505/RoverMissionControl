@@ -1,0 +1,151 @@
+/* ResponsiveImage Component Styles */
+
+.responsive-image-container {
+  position: relative;
+  display: inline-block;
+  overflow: hidden;
+}
+
+.responsive-image-placeholder {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100px;
+  transition: all 0.3s ease;
+}
+
+.responsive-image-placeholder:hover {
+  background: var(--bg-panel-light);
+  border-color: var(--border-color-light);
+}
+
+.responsive-image {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  transition: opacity 0.3s ease-in-out, transform 0.3s ease;
+}
+
+.responsive-image.fade-in {
+  opacity: 1;
+}
+
+.responsive-image-container.loaded .responsive-image {
+  transform: scale(1);
+}
+
+.responsive-image-container:hover .responsive-image {
+  transform: scale(1.02);
+}
+
+/* Loading Indicator */
+.image-loading-indicator {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1;
+}
+
+.loading-spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--border-color);
+  border-top: 2px solid var(--accent-blue);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Error State */
+.image-error-fallback {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: var(--status-error);
+  font-size: 0.8rem;
+  text-align: center;
+  background: rgba(239, 68, 68, 0.1);
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+/* Rover-specific image styles */
+.rover-image {
+  border-radius: 8px;
+  box-shadow: var(--shadow-medium);
+}
+
+.rover-image:hover {
+  box-shadow: var(--shadow-large);
+}
+
+.mission-badge {
+  border-radius: 50%;
+  border: 2px solid var(--accent-blue);
+  padding: 4px;
+}
+
+.telemetry-background {
+  border-radius: 12px;
+  opacity: 0.8;
+}
+
+.icon-image {
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+}
+
+/* Responsive behavior */
+@media (max-width: 768px) {
+  .responsive-image-container:hover .responsive-image {
+    transform: scale(1); /* Disable hover effects on mobile */
+  }
+  
+  .loading-spinner {
+    width: 20px;
+    height: 20px;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .responsive-image-placeholder {
+    border-width: 2px;
+  }
+  
+  .image-error-fallback {
+    border-width: 2px;
+    background: var(--bg-primary);
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .responsive-image,
+  .loading-spinner,
+  .responsive-image-placeholder {
+    transition: none;
+    animation: none;
+  }
+}
+
+/* Print styles */
+@media print {
+  .responsive-image-container {
+    page-break-inside: avoid;
+  }
+  
+  .image-loading-indicator,
+  .image-error-fallback {
+    display: none;
+  }
+}

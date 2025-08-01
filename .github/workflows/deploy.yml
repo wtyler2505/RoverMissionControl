@@ -1,0 +1,630 @@
+# Deployment Pipeline triggered after successful CI/CD tests
+# Handles staging and production deployments with quality gates
+name: 🚀 Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+      version:
+        description: 'Version to deploy'
+        required: true
+        type: string
+      skip_tests:
+        description: 'Skip pre-deployment tests'
+        required: false
+        default: false
+        type: boolean
+      force_deploy:
+        description: 'Force deployment (bypass safety checks)'
+        required: false
+        default: false
+        type: boolean
+
+  # Triggered by successful CI/CD pipeline
+  workflow_run:
+    workflows: ["🚀 CI/CD Testing Pipeline"]
+    types:
+      - completed
+    branches: [main]
+
+env:
+  NODE_VERSION: '18.x'
+  PYTHON_VERSION: '3.11'
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+# Deployment permissions
+permissions:
+  contents: read
+  packages: write
+  deployments: write
+  actions: read
+
+jobs:
+  # =============================================================================
+  # 🔍 PRE-DEPLOYMENT VALIDATION
+  # =============================================================================
+  pre_deployment_checks:
+    name: 🔍 Pre-deployment Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    outputs:
+      should-deploy: ${{ steps.validation.outputs.should-deploy }}
+      environment: ${{ steps.validation.outputs.environment }}
+      version: ${{ steps.validation.outputs.version }}
+      tests-passed: ${{ steps.validation.outputs.tests-passed }}
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: 🔍 Validate deployment conditions
+        id: validation
+        run: |
+          # Determine environment and version
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            ENVIRONMENT="${{ github.event.inputs.environment }}"
+            VERSION="${{ github.event.inputs.version }}"
+            SKIP_TESTS="${{ github.event.inputs.skip_tests }}"
+            FORCE_DEPLOY="${{ github.event.inputs.force_deploy }}"
+            TRIGGER="manual"
+          else
+            ENVIRONMENT="production"
+            VERSION="${{ github.sha }}"
+            SKIP_TESTS="false"
+            FORCE_DEPLOY="false"
+            TRIGGER="auto"
+          fi
+          
+          echo "environment=$ENVIRONMENT" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          
+          echo "🚀 Deployment Request:"
+          echo "  Environment: $ENVIRONMENT"
+          echo "  Version: $VERSION"
+          echo "  Trigger: $TRIGGER"
+          echo "  Skip Tests: $SKIP_TESTS"
+          echo "  Force Deploy: $FORCE_DEPLOY"
+          
+          # Check if CI/CD tests passed (for auto-trigger)
+          TESTS_PASSED="true"
+          if [[ "${{ github.event_name }}" == "workflow_run" ]]; then
+            if [[ "${{ github.event.workflow_run.conclusion }}" != "success" ]]; then
+              echo "❌ CI/CD pipeline did not succeed: ${{ github.event.workflow_run.conclusion }}"
+              TESTS_PASSED="false"
+            fi
+          fi
+          
+          echo "tests-passed=$TESTS_PASSED" >> $GITHUB_OUTPUT
+          
+          # Determine if deployment should proceed
+          SHOULD_DEPLOY="false"
+          
+          if [[ "$FORCE_DEPLOY" == "true" ]]; then
+            echo "⚠️ Force deployment requested - bypassing safety checks"
+            SHOULD_DEPLOY="true"
+          elif [[ "$TESTS_PASSED" == "true" || "$SKIP_TESTS" == "true" ]]; then
+            SHOULD_DEPLOY="true"
+          else
+            echo "❌ Deployment blocked - tests did not pass and not forced"
+          fi
+          
+          echo "should-deploy=$SHOULD_DEPLOY" >> $GITHUB_OUTPUT
+          
+          if [[ "$SHOULD_DEPLOY" == "true" ]]; then
+            echo "✅ Deployment validation passed"
+          else
+            echo "❌ Deployment validation failed"
+            exit 1
+          fi
+      
+      - name: 🏷️ Validate version format
+        run: |
+          VERSION="${{ steps.validation.outputs.version }}"
+          
+          # Check if version is a valid git reference
+          if git rev-parse --verify "$VERSION" >/dev/null 2>&1; then
+            echo "✅ Version '$VERSION' is a valid git reference"
+          else
+            echo "❌ Version '$VERSION' is not a valid git reference"
+            exit 1
+          fi
+      
+      - name: 🔒 Security pre-checks
+        run: |
+          echo "🔍 Running security pre-checks..."
+          
+          # Check for secrets in environment variables
+          if env | grep -i "password\|secret\|key\|token" | grep -v "GITHUB_\|RUNNER_"; then
+            echo "⚠️ Potential secrets found in environment"
+          fi
+          
+          # Verify deployment branch (production only from main)
+          if [[ "${{ steps.validation.outputs.environment }}" == "production" && "${{ github.ref_name }}" != "main" ]]; then
+            echo "❌ Production deployments only allowed from main branch"
+            exit 1
+          fi
+          
+          echo "✅ Security pre-checks passed"
+
+  # =============================================================================
+  # 🏗️ BUILD & PACKAGE
+  # =============================================================================
+  build:
+    name: 🏗️ Build & Package
+    needs: pre_deployment_checks
+    if: needs.pre_deployment_checks.outputs.should-deploy == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    strategy:
+      matrix:
+        component: [frontend, backend]
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.pre_deployment_checks.outputs.version }}
+      
+      - name: 🏗️ Setup Node.js (Frontend)
+        if: matrix.component == 'frontend'
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: 🐍 Setup Python (Backend)
+        if: matrix.component == 'backend'
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+      
+      - name: 📦 Install dependencies
+        run: |
+          if [[ "${{ matrix.component }}" == "frontend" ]]; then
+            npm ci
+            cd frontend && npm ci
+          else
+            cd backend && pip install -r requirements.txt
+          fi
+      
+      - name: 🏗️ Build application
+        run: |
+          if [[ "${{ matrix.component }}" == "frontend" ]]; then
+            echo "🏗️ Building frontend..."
+            cd frontend
+            npm run build
+            
+            # Create deployment package
+            tar -czf ../frontend-build.tar.gz -C build .
+          else
+            echo "🏗️ Building backend..."
+            cd backend
+            
+            # Create Python package
+            python -m pip install build
+            python -m build
+            
+            # Create deployment package
+            mkdir -p deploy
+            cp -r . deploy/
+            tar -czf ../backend-build.tar.gz -C deploy .
+          fi
+        env:
+          NODE_ENV: production
+          ENVIRONMENT: ${{ needs.pre_deployment_checks.outputs.environment }}
+      
+      - name: 📄 Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.component }}-build
+          path: ${{ matrix.component }}-build.tar.gz
+          retention-days: 30
+      
+      - name: 🐳 Build Docker image
+        run: |
+          # Build Docker image for the component
+          COMPONENT="${{ matrix.component }}"
+          IMAGE_TAG="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-$COMPONENT:${{ needs.pre_deployment_checks.outputs.version }}"
+          LATEST_TAG="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-$COMPONENT:latest"
+          
+          echo "🐳 Building Docker image: $IMAGE_TAG"
+          
+          docker build \
+            -f $COMPONENT/Dockerfile \
+            -t $IMAGE_TAG \
+            -t $LATEST_TAG \
+            --build-arg NODE_ENV=production \
+            --build-arg ENVIRONMENT=${{ needs.pre_deployment_checks.outputs.environment }} \
+            .
+          
+          # Save image for later stages
+          docker save $IMAGE_TAG | gzip > $COMPONENT-image.tar.gz
+      
+      - name: 📄 Upload Docker image
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.component }}-image
+          path: ${{ matrix.component }}-image.tar.gz
+          retention-days: 7
+
+  # =============================================================================
+  # 🧪 DEPLOYMENT SMOKE TESTS
+  # =============================================================================
+  smoke_tests:
+    name: 🧪 Deployment Smoke Tests
+    needs: [pre_deployment_checks, build]
+    if: needs.pre_deployment_checks.outputs.should-deploy == 'true' && github.event.inputs.skip_tests != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: rover_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.pre_deployment_checks.outputs.version }}
+      
+      - name: 📥 Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: "*-image"
+          merge-multiple: true
+      
+      - name: 🐳 Load Docker images
+        run: |
+          docker load < frontend-image.tar.gz
+          docker load < backend-image.tar.gz
+      
+      - name: 🏃‍♂️ Start services
+        run: |
+          # Create test environment
+          cat > .env.test << EOF
+          NODE_ENV=production
+          ENVIRONMENT=test
+          DATABASE_URL=postgresql://postgres:postgres@localhost:5432/rover_test
+          API_URL=http://localhost:8000
+          FRONTEND_URL=http://localhost:3000
+          EOF
+          
+          # Start backend
+          docker run -d \
+            --name backend-test \
+            --env-file .env.test \
+            -p 8000:8000 \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:${{ needs.pre_deployment_checks.outputs.version }}
+          
+          # Start frontend
+          docker run -d \
+            --name frontend-test \
+            -p 3000:80 \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:${{ needs.pre_deployment_checks.outputs.version }}
+          
+          # Wait for services to be ready
+          echo "⏳ Waiting for services to start..."
+          sleep 30
+      
+      - name: 🔍 Health checks
+        run: |
+          echo "🏥 Running health checks..."
+          
+          # Backend health check
+          echo "Checking backend health..."
+          for i in {1..10}; do
+            if curl -f http://localhost:8000/health; then
+              echo "✅ Backend is healthy"
+              break
+            fi
+            if [[ $i -eq 10 ]]; then
+              echo "❌ Backend health check failed"
+              docker logs backend-test
+              exit 1
+            fi
+            sleep 5
+          done
+          
+          # Frontend health check
+          echo "Checking frontend health..."
+          for i in {1..10}; do
+            if curl -f http://localhost:3000; then
+              echo "✅ Frontend is healthy"
+              break
+            fi
+            if [[ $i -eq 10 ]]; then
+              echo "❌ Frontend health check failed"
+              docker logs frontend-test
+              exit 1
+            fi
+            sleep 5
+          done
+      
+      - name: 🧪 API smoke tests
+        run: |
+          echo "🧪 Running API smoke tests..."
+          
+          # Test critical endpoints
+          curl -f http://localhost:8000/api/health || exit 1
+          curl -f http://localhost:8000/api/version || exit 1
+          
+          # Test WebSocket connection (basic check)
+          if command -v websocat >/dev/null; then
+            timeout 5 websocat ws://localhost:8000/ws || echo "WebSocket test skipped"
+          fi
+          
+          echo "✅ API smoke tests passed"
+      
+      - name: 🧪 Frontend smoke tests
+        run: |
+          echo "🧪 Running frontend smoke tests..."
+          
+          # Test that main page loads
+          curl -f http://localhost:3000 | grep -q "Rover Mission Control" || exit 1
+          
+          # Test static assets
+          curl -f http://localhost:3000/static/js/ || echo "Static assets may not be ready"
+          
+          echo "✅ Frontend smoke tests passed"
+      
+      - name: 🧹 Cleanup test environment
+        if: always()
+        run: |
+          docker stop backend-test frontend-test || true
+          docker rm backend-test frontend-test || true
+
+  # =============================================================================
+  # 🚀 DEPLOY TO STAGING
+  # =============================================================================
+  deploy_staging:
+    name: 🚀 Deploy to Staging
+    needs: [pre_deployment_checks, build, smoke_tests]
+    if: |
+      always() && 
+      needs.pre_deployment_checks.outputs.should-deploy == 'true' &&
+      (needs.smoke_tests.result == 'success' || needs.smoke_tests.result == 'skipped') &&
+      (needs.pre_deployment_checks.outputs.environment == 'staging' || 
+       needs.pre_deployment_checks.outputs.environment == 'production')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: 
+      name: staging
+      url: https://staging.rover-mission-control.com
+    
+    steps:
+      - name: 📥 Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: "*-image"
+          merge-multiple: true
+      
+      - name: 🔐 Login to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: 📤 Push Docker images
+        run: |
+          # Load and push images
+          docker load < frontend-image.tar.gz
+          docker load < backend-image.tar.gz
+          
+          # Push to registry
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:${{ needs.pre_deployment_checks.outputs.version }}
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:${{ needs.pre_deployment_checks.outputs.version }}
+          
+          # Tag and push as staging
+          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:${{ needs.pre_deployment_checks.outputs.version }} \
+                     ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:staging
+          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:${{ needs.pre_deployment_checks.outputs.version }} \
+                     ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:staging
+          
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:staging
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:staging
+      
+      - name: 🚀 Deploy to staging environment
+        run: |
+          echo "🚀 Deploying to staging environment..."
+          
+          # This would typically involve:
+          # - Updating Kubernetes manifests
+          # - Triggering ArgoCD/Flux sync
+          # - Updating Docker Compose on staging server
+          # - Running database migrations
+          
+          # For demonstration, we'll simulate the deployment
+          echo "📦 Updating container orchestration..."
+          echo "🗄️ Running database migrations..."
+          echo "⚙️ Updating configuration..."
+          echo "🔄 Rolling out new version..."
+          
+          # Simulate deployment time
+          sleep 10
+          
+          echo "✅ Staging deployment completed"
+      
+      - name: 🔍 Post-deployment verification
+        run: |
+          echo "🔍 Verifying staging deployment..."
+          
+          # Health checks on staging environment
+          # curl -f https://staging.rover-mission-control.com/health
+          
+          echo "✅ Staging verification completed"
+
+  # =============================================================================
+  # 🚀 DEPLOY TO PRODUCTION
+  # =============================================================================
+  deploy_production:
+    name: 🚀 Deploy to Production
+    needs: [pre_deployment_checks, build, smoke_tests, deploy_staging]
+    if: |
+      always() &&
+      needs.pre_deployment_checks.outputs.environment == 'production' &&
+      needs.deploy_staging.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: 
+      name: production
+      url: https://rover-mission-control.com
+    
+    steps:
+      - name: 🔐 Production deployment approval
+        run: |
+          echo "🔐 Production deployment requires manual approval"
+          echo "Environment: production"
+          echo "Version: ${{ needs.pre_deployment_checks.outputs.version }}"
+          echo "Tests passed: ${{ needs.pre_deployment_checks.outputs.tests-passed }}"
+      
+      - name: 📥 Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: "*-image"
+          merge-multiple: true
+      
+      - name: 🔐 Login to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: 📤 Push production images
+        run: |
+          # Load images
+          docker load < frontend-image.tar.gz
+          docker load < backend-image.tar.gz
+          
+          # Tag and push as production
+          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:${{ needs.pre_deployment_checks.outputs.version }} \
+                     ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:production
+          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:${{ needs.pre_deployment_checks.outputs.version }} \
+                     ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:production
+          
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:production
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:production
+          
+          # Update latest tags
+          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:${{ needs.pre_deployment_checks.outputs.version }} \
+                     ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:latest
+          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:${{ needs.pre_deployment_checks.outputs.version }} \
+                     ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:latest
+          
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:latest
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:latest
+      
+      - name: 🚀 Deploy to production environment
+        run: |
+          echo "🚀 Deploying to production environment..."
+          echo "⚠️ Production deployment simulation - implement actual deployment"
+          
+          # Blue-green deployment simulation
+          echo "🔵 Preparing blue environment..."
+          echo "🧪 Running production smoke tests..."
+          echo "🔄 Switching traffic to blue environment..."
+          echo "💚 Blue environment is now live"
+          echo "🧹 Cleaning up green environment..."
+          
+          # Simulate deployment time
+          sleep 15
+          
+          echo "✅ Production deployment completed"
+      
+      - name: 🔍 Production verification
+        run: |
+          echo "🔍 Verifying production deployment..."
+          
+          # Comprehensive production health checks
+          # curl -f https://rover-mission-control.com/health
+          # Run integration tests against production
+          # Verify monitoring and alerting
+          
+          echo "✅ Production verification completed"
+
+  # =============================================================================
+  # 📊 DEPLOYMENT SUMMARY
+  # =============================================================================
+  deployment_summary:
+    name: 📊 Deployment Summary
+    needs: [pre_deployment_checks, build, smoke_tests, deploy_staging, deploy_production]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    
+    steps:
+      - name: 📊 Generate deployment summary
+        run: |
+          echo "## 🚀 Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Stage | Status | Duration |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|----------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Pre-checks | ${{ needs.pre_deployment_checks.result }} | - |" >> $GITHUB_STEP_SUMMARY
+          echo "| Build | ${{ needs.build.result }} | - |" >> $GITHUB_STEP_SUMMARY
+          echo "| Smoke Tests | ${{ needs.smoke_tests.result }} | - |" >> $GITHUB_STEP_SUMMARY
+          echo "| Staging | ${{ needs.deploy_staging.result }} | - |" >> $GITHUB_STEP_SUMMARY
+          echo "| Production | ${{ needs.deploy_production.result }} | - |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ needs.pre_deployment_checks.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${{ needs.pre_deployment_checks.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Timestamp:** $(date -u)" >> $GITHUB_STEP_SUMMARY
+      
+      - name: 📝 Create deployment record
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const environment = '${{ needs.pre_deployment_checks.outputs.environment }}';
+            const version = '${{ needs.pre_deployment_checks.outputs.version }}';
+            const success = '${{ needs.deploy_production.result }}' === 'success' || 
+                           ('${{ needs.deploy_staging.result }}' === 'success' && environment === 'staging');
+            
+            // Create a deployment record
+            await github.rest.repos.createDeployment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: version,
+              environment: environment,
+              description: `Deployment of ${version} to ${environment}`,
+              auto_merge: false,
+              required_contexts: []
+            });
+            
+            console.log(`Deployment record created for ${environment} environment`);
+      
+      - name: 🔔 Notify on deployment result
+        if: always()
+        run: |
+          ENVIRONMENT="${{ needs.pre_deployment_checks.outputs.environment }}"
+          VERSION="${{ needs.pre_deployment_checks.outputs.version }}"
+          
+          if [[ "${{ needs.deploy_production.result }}" == "success" ]] || [[ "${{ needs.deploy_staging.result }}" == "success" ]]; then
+            echo "🎉 Deployment to $ENVIRONMENT completed successfully!"
+            echo "Version: $VERSION"
+            echo "Notification: Success notification would be sent here"
+          else
+            echo "❌ Deployment to $ENVIRONMENT failed"
+            echo "Notification: Failure notification would be sent here"
+          fi

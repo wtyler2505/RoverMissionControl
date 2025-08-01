@@ -1,0 +1,70 @@
+{
+  "recording_id": "recording_1753686205",
+  "start_time": "2025-07-28T02:03:25.508812",
+  "end_time": "2025-07-28T02:03:28.086948",
+  "events": [
+    {
+      "timestamp": "2025-07-28T02:03:25.509202",
+      "event_type": "simulation_started",
+      "source": "simulation_engine",
+      "data": {
+        "mode": "realtime",
+        "time_acceleration": 2.0
+      },
+      "metadata": {
+        "simulation_time": 0.0,
+        "mode": "realtime"
+      }
+    },
+    {
+      "timestamp": "2025-07-28T02:03:26.023996",
+      "event_type": "device_added",
+      "source": "simulation_engine",
+      "data": {
+        "device_id": "temp_sensor_01",
+        "device_type": "sensor",
+        "name": "Temperature Sensor"
+      },
+      "metadata": {
+        "simulation_time": 1.7999999999999998,
+        "mode": "realtime"
+      }
+    },
+    {
+      "timestamp": "2025-07-28T02:03:26.538793",
+      "event_type": "device_added",
+      "source": "simulation_engine",
+      "data": {
+        "device_id": "imu_sensor_01",
+        "device_type": "sensor",
+        "name": "6-DOF IMU"
+      },
+      "metadata": {
+        "simulation_time": 3.400000000000001,
+        "mode": "realtime"
+      }
+    },
+    {
+      "timestamp": "2025-07-28T02:03:27.071832",
+      "event_type": "device_added",
+      "source": "simulation_engine",
+      "data": {
+        "device_id": "dc_motor_01",
+        "device_type": "actuator",
+        "name": "Drive Motor"
+      },
+      "metadata": {
+        "simulation_time": 5.000000000000002,
+        "mode": "realtime"
+      }
+    }
+  ],
+  "metadata": {
+    "config": {
+      "simulation_rate": 10.0,
+      "time_acceleration": 2.0,
+      "physics_enabled": true,
+      "network_enabled": true
+    }
+  }
+}

@@ -1,0 +1,186 @@
+version: '3.9'
+
+# Security scanning services for local development
+services:
+  # Trivy server for continuous vulnerability scanning
+  trivy-server:
+    image: aquasec/trivy:latest
+    command: server --listen 0.0.0.0:8080
+    ports:
+      - "8080:8080"
+    volumes:
+      - trivy-cache:/root/.cache/trivy
+    environment:
+      TRIVY_DEBUG: "false"
+      TRIVY_QUIET: "false"
+      TRIVY_CACHE_DIR: /root/.cache/trivy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "--quiet", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Local vulnerability database updater
+  trivy-db-updater:
+    image: aquasec/trivy:latest
+    command: image --download-db-only
+    volumes:
+      - trivy-cache:/root/.cache/trivy
+    restart: "no"
+    depends_on:
+      - trivy-server
+
+  # OPA server for policy evaluation
+  opa-server:
+    image: openpolicyagent/opa:latest-envoy
+    ports:
+      - "8181:8181"
+      - "9191:9191"
+    command:
+      - "run"
+      - "--server"
+      - "--log-level=info"
+      - "--config-file=/config/config.yaml"
+      - "/policies"
+    volumes:
+      - ./.github/security-policies:/policies:ro
+      - ./docker/opa-config.yaml:/config/config.yaml:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8181/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Dependency Track for SBOM management
+  dependency-track:
+    image: dependencytrack/bundled:latest
+    ports:
+      - "8082:8080"
+    volumes:
+      - dependency-track-data:/data
+    environment:
+      ALPINE_DATABASE_MODE: external
+      ALPINE_DATABASE_URL: jdbc:postgresql://dependency-track-db:5432/dtrack
+      ALPINE_DATABASE_DRIVER: org.postgresql.Driver
+      ALPINE_DATABASE_USERNAME: dtrack
+      ALPINE_DATABASE_PASSWORD: dtrack_secure_password_change_me
+    depends_on:
+      - dependency-track-db
+    restart: unless-stopped
+
+  dependency-track-db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: dtrack
+      POSTGRES_USER: dtrack
+      POSTGRES_PASSWORD: dtrack_secure_password_change_me
+    volumes:
+      - dependency-track-db:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  # Clair for container scanning (alternative to Trivy)
+  clair:
+    image: quay.io/coreos/clair:latest
+    ports:
+      - "6060:6060"
+      - "6061:6061"
+    depends_on:
+      - clair-db
+    volumes:
+      - ./docker/clair-config.yaml:/config/config.yaml:ro
+    command: ["-config", "/config/config.yaml"]
+    restart: unless-stopped
+
+  clair-db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: clair
+      POSTGRES_USER: clair
+      POSTGRES_PASSWORD: clair_secure_password_change_me
+    volumes:
+      - clair-db:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  # Security scanning orchestrator (custom service)
+  security-scanner:
+    build:
+      context: ./docker/security-scanner
+      dockerfile: Dockerfile
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./scan-results:/results
+      - ./.github/security-policies:/policies:ro
+    environment:
+      TRIVY_SERVER: http://trivy-server:8080
+      OPA_SERVER: http://opa-server:8181
+      DEPENDENCY_TRACK_URL: http://dependency-track:8080
+      DEPENDENCY_TRACK_API_KEY: ${DEPENDENCY_TRACK_API_KEY}
+      SCAN_INTERVAL: 3600  # Scan every hour
+      SEVERITY_THRESHOLD: HIGH
+    depends_on:
+      - trivy-server
+      - opa-server
+      - dependency-track
+    restart: unless-stopped
+
+  # Prometheus for metrics collection
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./docker/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    restart: unless-stopped
+
+  # Grafana for security metrics visualization
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_INSTALL_PLUGINS: grafana-piechart-panel,grafana-worldmap-panel
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./docker/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+  # AlertManager for security alerts
+  alertmanager:
+    image: prom/alertmanager:latest
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./docker/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager-data:/alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+    restart: unless-stopped
+
+volumes:
+  trivy-cache:
+  dependency-track-data:
+  dependency-track-db:
+  clair-db:
+  prometheus-data:
+  grafana-data:
+  alertmanager-data:
+
+networks:
+  default:
+    name: rover-security-network
+    driver: bridge

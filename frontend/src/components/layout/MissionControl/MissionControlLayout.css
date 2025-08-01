@@ -1,0 +1,459 @@
+/**
+ * Mission Control Layout CSS
+ * Responsive behavior, transitions, and accessibility styles
+ */
+
+/* Root layout container */
+.mission-control-layout {
+  --transition-duration: 0.3s;
+  --transition-easing: cubic-bezier(0.4, 0, 0.2, 1);
+  --focus-color: #0066cc;
+  --focus-shadow: 0 0 0 2px rgba(0, 102, 204, 0.2);
+  --border-radius: 8px;
+  --spacing-xs: 2px;
+  --spacing-sm: 4px;
+  --spacing-md: 8px;
+  --spacing-lg: 16px;
+}
+
+/* Screen reader only content */
+.sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+/* Layout transition animations */
+.mission-control-layout[data-transitioning="true"] {
+  pointer-events: none;
+}
+
+.mission-control-layout[data-transitioning="true"] * {
+  transition: all var(--transition-duration) var(--transition-easing);
+}
+
+/* Smooth grid transitions */
+.mission-control-layout {
+  transition: 
+    grid-template-areas var(--transition-duration) var(--transition-easing),
+    grid-template-columns var(--transition-duration) var(--transition-easing),
+    grid-template-rows var(--transition-duration) var(--transition-easing);
+}
+
+/* Area animations */
+@keyframes areaFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes areaFadeOut {
+  from {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.95) translateY(-10px);
+  }
+}
+
+@keyframes areaSlideIn {
+  from {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes areaSlideOut {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+}
+
+/* Area-specific animations */
+.area-grid[data-area="sidebar"] {
+  animation: areaSlideIn var(--transition-duration) var(--transition-easing);
+}
+
+.area-grid[data-area="sidebar"][data-hidden="true"] {
+  animation: areaSlideOut var(--transition-duration) var(--transition-easing);
+}
+
+.area-grid:not([data-area="sidebar"]) {
+  animation: areaFadeIn var(--transition-duration) var(--transition-easing);
+}
+
+.area-grid:not([data-area="sidebar"])[data-hidden="true"] {
+  animation: areaFadeOut var(--transition-duration) var(--transition-easing);
+}
+
+/* Focus management styles */
+.mission-control-layout:focus {
+  outline: 2px solid var(--focus-color);
+  outline-offset: 2px;
+}
+
+.area-grid:focus-within {
+  border-color: var(--focus-color);
+  box-shadow: var(--focus-shadow);
+  z-index: 10;
+}
+
+/* Panel focus indicators */
+.area-grid[data-focused="true"] {
+  border-color: var(--focus-color);
+  box-shadow: var(--focus-shadow);
+  position: relative;
+  z-index: 5;
+}
+
+.area-grid[data-focused="true"]::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  border: 2px solid var(--focus-color);
+  border-radius: calc(var(--border-radius) + 2px);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* High contrast mode */
+.mission-control-layout[data-high-contrast="true"] {
+  filter: contrast(1.5);
+  --focus-color: #ffffff;
+  --focus-shadow: 0 0 0 3px rgba(255, 255, 255, 0.8);
+}
+
+.mission-control-layout[data-high-contrast="true"] * {
+  border-width: 2px !important;
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .mission-control-layout,
+  .mission-control-layout * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Responsive breakpoints */
+
+/* Large screens (1920px+) */
+@media (min-width: 1920px) {
+  .mission-control-layout {
+    gap: var(--spacing-md);
+    padding: var(--spacing-md);
+  }
+  
+  .area-grid {
+    border-radius: var(--border-radius);
+  }
+}
+
+/* Medium screens (1366px - 1919px) */
+@media (max-width: 1919px) and (min-width: 1366px) {
+  .mission-control-layout {
+    gap: calc(var(--spacing-md) * 0.75);
+    padding: calc(var(--spacing-md) * 0.75);
+  }
+  
+  /* Hide low priority areas */
+  .area-grid[data-priority="4"],
+  .area-grid[data-priority="5"] {
+    display: none;
+  }
+}
+
+/* Small screens (1024px - 1365px) */
+@media (max-width: 1365px) and (min-width: 1024px) {
+  .mission-control-layout {
+    gap: calc(var(--spacing-md) * 0.5);
+    padding: calc(var(--spacing-md) * 0.5);
+  }
+  
+  /* Hide medium priority areas */
+  .area-grid[data-priority="3"],
+  .area-grid[data-priority="4"],
+  .area-grid[data-priority="5"] {
+    display: none;
+  }
+  
+  /* Adjust grid templates for smaller screens */
+  .mission-control-layout[data-preset="operations"] {
+    grid-template-columns: 1fr 280px !important;
+  }
+  
+  .mission-control-layout[data-preset="analysis"] {
+    grid-template-columns: 1fr 280px !important;
+  }
+}
+
+/* Extra small screens (768px - 1023px) */
+@media (max-width: 1023px) and (min-width: 768px) {
+  .mission-control-layout {
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm);
+  }
+  
+  /* Hide all but highest priority areas */
+  .area-grid[data-priority="2"],
+  .area-grid[data-priority="3"],
+  .area-grid[data-priority="4"],
+  .area-grid[data-priority="5"] {
+    display: none;
+  }
+  
+  /* Single column layout */
+  .mission-control-layout {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Mobile screens (< 768px) */
+@media (max-width: 767px) {
+  .mission-control-layout {
+    gap: var(--spacing-xs);
+    padding: var(--spacing-xs);
+  }
+  
+  /* Only show highest priority areas */
+  .area-grid:not([data-priority="1"]) {
+    display: none;
+  }
+  
+  /* Stack layout */
+  .mission-control-layout {
+    grid-template-columns: 1fr !important;
+    grid-template-areas: 
+      "header"
+      "main-3d"
+      "footer" !important;
+  }
+  
+  /* Preset selector adjustments */
+  .preset-selector {
+    position: fixed;
+    bottom: var(--spacing-md);
+    right: var(--spacing-md);
+    flex-direction: column;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(10px);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-sm);
+  }
+  
+  .preset-selector button {
+    font-size: 10px;
+    padding: 4px 8px;
+    min-width: 60px;
+  }
+}
+
+/* Preset-specific responsive behavior */
+
+/* Operations layout responsive */
+.mission-control-layout[data-preset="operations"] {
+  /* Sidebar collapse priority */
+  @media (max-width: 1365px) {
+    grid-template-areas: 
+      "header header header"
+      "main-3d main-3d status"
+      "telemetry telemetry status"
+      "footer footer footer" !important;
+  }
+  
+  @media (max-width: 1023px) {
+    grid-template-areas: 
+      "header header"
+      "main-3d status"
+      "telemetry status"
+      "footer footer" !important;
+  }
+  
+  @media (max-width: 767px) {
+    grid-template-areas: 
+      "header"
+      "main-3d"
+      "telemetry"
+      "footer" !important;
+  }
+}
+
+/* Emergency layout responsive */
+.mission-control-layout[data-preset="emergency"] {
+  @media (max-width: 1365px) {
+    grid-template-areas: 
+      "alerts alerts alerts"
+      "main-3d main-3d comms"
+      "commands commands comms"
+      "emergency emergency emergency" !important;
+  }
+  
+  @media (max-width: 1023px) {
+    grid-template-areas: 
+      "alerts alerts"
+      "main-3d comms"
+      "commands comms"
+      "emergency emergency" !important;
+  }
+}
+
+/* Analysis layout responsive */
+.mission-control-layout[data-preset="analysis"] {
+  @media (max-width: 1365px) {
+    grid-template-areas: 
+      "header header header"
+      "charts charts data"
+      "timeline timeline data"
+      "footer footer footer" !important;
+  }
+}
+
+/* Maintenance layout responsive */
+.mission-control-layout[data-preset="maintenance"] {
+  @media (max-width: 1365px) {
+    grid-template-areas: 
+      "header header header"
+      "hardware hardware logs"
+      "firmware firmware logs"
+      "footer footer footer" !important;
+  }
+}
+
+/* Loading states */
+.mission-control-layout[data-loading="true"] {
+  opacity: 0.8;
+  pointer-events: none;
+}
+
+.mission-control-layout[data-loading="true"]::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 40px;
+  height: 40px;
+  border: 4px solid rgba(0, 102, 204, 0.2);
+  border-top: 4px solid #0066cc;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  transform: translate(-50%, -50%);
+  z-index: 1000;
+}
+
+@keyframes spin {
+  0% { transform: translate(-50%, -50%) rotate(0deg); }
+  100% { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+/* Error states */
+.mission-control-layout[data-error="true"] {
+  border: 2px solid #dc3545;
+  background: rgba(220, 53, 69, 0.05);
+}
+
+.mission-control-layout[data-error="true"]::before {
+  content: 'Layout Error - Check Console';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: #dc3545;
+  color: white;
+  padding: var(--spacing-md);
+  border-radius: var(--border-radius);
+  font-weight: bold;
+  z-index: 1000;
+}
+
+/* Print styles */
+@media print {
+  .mission-control-layout {
+    background: white !important;
+    color: black !important;
+    box-shadow: none !important;
+  }
+  
+  .preset-selector {
+    display: none !important;
+  }
+  
+  .area-grid {
+    border: 1px solid black !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}
+
+/* Dark mode adjustments */
+@media (prefers-color-scheme: dark) {
+  .mission-control-layout {
+    --focus-color: #66b3ff;
+    --focus-shadow: 0 0 0 2px rgba(102, 179, 255, 0.2);
+  }
+}
+
+/* Touch device optimizations */
+@media (hover: none) and (pointer: coarse) {
+  .preset-selector button {
+    min-height: 44px;
+    min-width: 44px;
+    font-size: 14px;
+  }
+  
+  .area-grid {
+    touch-action: manipulation;
+  }
+}
+
+/* Custom scrollbars */
+.area-grid::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.area-grid::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+}
+
+.area-grid::-webkit-scrollbar-thumb {
+  background: rgba(0, 102, 204, 0.3);
+  border-radius: 4px;
+}
+
+.area-grid::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 102, 204, 0.5);
+}
+
+/* Firefox scrollbars */
+.area-grid {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 102, 204, 0.3) rgba(0, 0, 0, 0.1);
+}

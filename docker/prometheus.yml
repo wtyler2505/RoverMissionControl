@@ -1,0 +1,59 @@
+# Prometheus configuration for security monitoring
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'rover-security'
+
+# Alerting configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+
+# Load rules
+rule_files:
+  - '/etc/prometheus/rules/*.yml'
+
+# Scrape configurations
+scrape_configs:
+  # Security scanner metrics
+  - job_name: 'security-scanner'
+    static_configs:
+      - targets: ['security-scanner:8000']
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'security_.*'
+        action: keep
+
+  # Trivy server metrics
+  - job_name: 'trivy'
+    static_configs:
+      - targets: ['trivy-server:8080']
+
+  # OPA metrics
+  - job_name: 'opa'
+    static_configs:
+      - targets: ['opa-server:8181']
+    metrics_path: '/metrics'
+
+  # Dependency Track metrics
+  - job_name: 'dependency-track'
+    static_configs:
+      - targets: ['dependency-track:8080']
+    metrics_path: '/metrics'
+
+  # Docker daemon metrics
+  - job_name: 'docker'
+    static_configs:
+      - targets: ['host.docker.internal:9323']
+
+  # Node exporter for system metrics
+  - job_name: 'node'
+    static_configs:
+      - targets: ['node-exporter:9100']
+
+# Remote write for long-term storage (optional)
+# remote_write:
+#   - url: "http://prometheus-remote-storage:9201/write"
