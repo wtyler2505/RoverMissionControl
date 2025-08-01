@@ -1,0 +1,71 @@
+{
+  "recording_id": "recording_1753685990",
+  "start_time": "2025-07-28T01:59:50.922968",
+  "end_time": "2025-07-28T01:59:57.734834",
+  "events": [
+    {
+      "timestamp": "2025-07-28T01:59:50.923508",
+      "event_type": "simulation_started",
+      "source": "simulation_engine",
+      "data": {
+        "mode": "realtime",
+        "time_acceleration": 1.0
+      },
+      "metadata": {
+        "simulation_time": 0.0,
+        "mode": "realtime"
+      }
+    },
+    {
+      "timestamp": "2025-07-28T01:59:51.956783",
+      "event_type": "device_added",
+      "source": "simulation_engine",
+      "data": {
+        "device_id": "sim_device_1",
+        "device_type": "sensor",
+        "name": "Temperature Sensor"
+      },
+      "metadata": {
+        "simulation_time": 0.6600000000000003,
+        "mode": "realtime"
+      }
+    },
+    {
+      "timestamp": "2025-07-28T01:59:52.471906",
+      "event_type": "device_added",
+      "source": "simulation_engine",
+      "data": {
+        "device_id": "sim_device_2",
+        "device_type": "sensor",
+        "name": "6-DOF IMU"
+      },
+      "metadata": {
+        "simulation_time": 0.9800000000000005,
+        "mode": "realtime"
+      }
+    },
+    {
+      "timestamp": "2025-07-28T01:59:57.660927",
+      "event_type": "device_state_changed",
+      "source": "simulation_engine",
+      "data": {
+        "device_id": "sim_device_1",
+        "state": {
+          "calibration_offset": 0.5
+        }
+      },
+      "metadata": {
+        "simulation_time": 4.319999999999996,
+        "mode": "realtime"
+      }
+    }
+  ],
+  "metadata": {
+    "config": {
+      "simulation_rate": 50.0,
+      "time_acceleration": 1.0,
+      "physics_enabled": true,
+      "network_enabled": true
+    }
+  }
+}

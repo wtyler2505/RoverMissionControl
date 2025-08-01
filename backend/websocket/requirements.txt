@@ -1,0 +1,31 @@
+# WebSocket Infrastructure Dependencies
+
+# Core WebSocket and Socket.IO
+python-socketio>=5.11.0
+websockets>=12.0
+
+# FastAPI integration for Socket.IO
+uvicorn[standard]>=0.30.0
+
+# Binary protocol support
+msgpack>=1.1.0
+cbor2>=5.6.0
+
+# Compression support
+lz4>=4.3.0
+
+# Security and authentication
+cryptography>=42.0.0
+pyjwt>=2.8.0
+
+# Performance and monitoring
+psutil>=6.0.0
+
+# Optional: Protocol Buffers support (uncomment if needed)
+# protobuf>=5.27.0
+# grpcio>=1.65.0
+
+# Testing dependencies (development only)
+pytest>=8.0.0
+pytest-asyncio>=0.23.0
+pytest-cov>=5.0.0
