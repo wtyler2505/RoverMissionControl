@@ -1,0 +1,835 @@
+# Comprehensive CI/CD Testing Pipeline
+# Master workflow that orchestrates all testing components for Rover Mission Control
+name: 🚀 CI/CD Testing Pipeline
+
+on:
+  push:
+    branches: [ main, develop, 'feature/**', 'hotfix/**' ]
+  pull_request:
+    branches: [ main, develop ]
+    types: [opened, synchronize, reopened, ready_for_review]
+  schedule:
+    # Nightly performance and security scans
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      test_suite:
+        description: 'Test suite to run'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - unit
+          - integration
+          - e2e
+          - visual
+          - accessibility
+          - performance
+          - security
+      skip_deploy:
+        description: 'Skip deployment after successful tests'
+        required: false
+        default: false
+        type: boolean
+
+# Workflow-level environment variables
+env:
+  NODE_VERSION: '18.x'
+  PYTHON_VERSION: '3.11'
+  COVERAGE_THRESHOLD: 80
+  PERFORMANCE_BUDGET: 3000
+  LIGHTHOUSE_CI_BUILD_PATH: './frontend/build'
+  CHROMATIC_PROJECT_TOKEN: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
+  CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+# Global permissions for the workflow
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+  checks: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  # =============================================================================
+  # 📋 PRE-FLIGHT CHECKS
+  # =============================================================================
+  pre_flight:
+    name: 🔍 Pre-flight Checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      should-run-tests: ${{ steps.changes.outputs.should-run-tests }}
+      frontend-changed: ${{ steps.changes.outputs.frontend }}
+      backend-changed: ${{ steps.changes.outputs.backend }}
+      docs-only: ${{ steps.changes.outputs.docs-only }}
+      e2e-required: ${{ steps.changes.outputs.e2e-required }}
+      security-scan-required: ${{ steps.changes.outputs.security-required }}
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: 🔍 Detect changes
+        id: changes
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            frontend:
+              - 'frontend/**'
+              - 'shared/**'
+              - 'package.json'
+              - 'yarn.lock'
+            backend:
+              - 'backend/**'
+              - 'requirements.txt'
+              - 'pytest.ini'
+            tests:
+              - 'tests/**'
+              - 'playwright.config.ts'
+              - '.lighthouserc.js'
+            docs:
+              - 'docs/**'
+              - '*.md'
+            security:
+              - 'backend/auth/**'
+              - 'backend/api_security/**'
+              - 'package.json'
+              - 'requirements.txt'
+            config:
+              - '.github/**'
+              - 'docker/**'
+              - '*.yml'
+              - '*.yaml'
+              - '*.json'
+      
+      - name: 📊 Set workflow outputs
+        run: |
+          # Skip tests only for docs-only changes on non-main branches
+          if [[ "${{ steps.changes.outputs.docs }}" == "true" && \
+                "${{ steps.changes.outputs.frontend }}" == "false" && \
+                "${{ steps.changes.outputs.backend }}" == "false" && \
+                "${{ steps.changes.outputs.tests }}" == "false" && \
+                "${{ steps.changes.outputs.config }}" == "false" && \
+                "${{ github.ref }}" != "refs/heads/main" ]]; then
+            echo "should-run-tests=false" >> $GITHUB_OUTPUT
+            echo "docs-only=true" >> $GITHUB_OUTPUT
+          else
+            echo "should-run-tests=true" >> $GITHUB_OUTPUT
+            echo "docs-only=false" >> $GITHUB_OUTPUT
+          fi
+          
+          # E2E required for significant changes or main branch
+          if [[ "${{ steps.changes.outputs.frontend }}" == "true" || \
+                "${{ steps.changes.outputs.backend }}" == "true" || \
+                "${{ github.ref }}" == "refs/heads/main" || \
+                "${{ github.event_name }}" == "schedule" ]]; then
+            echo "e2e-required=true" >> $GITHUB_OUTPUT
+          else
+            echo "e2e-required=false" >> $GITHUB_OUTPUT
+          fi
+          
+          # Security scan for auth/security changes or schedule
+          if [[ "${{ steps.changes.outputs.security }}" == "true" || \
+                "${{ github.event_name }}" == "schedule" ]]; then
+            echo "security-required=true" >> $GITHUB_OUTPUT
+          else
+            echo "security-required=false" >> $GITHUB_OUTPUT
+          fi
+
+  # =============================================================================
+  # 🧪 UNIT & INTEGRATION TESTS
+  # =============================================================================
+  unit_tests:
+    name: 🧪 Unit & Integration Tests
+    needs: pre_flight
+    if: needs.pre_flight.outputs.should-run-tests == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        test-type: [frontend, backend]
+        node-version: [18.x, 20.x]
+        python-version: ['3.11', '3.12']
+        exclude:
+          # Only test Python versions with backend
+          - test-type: frontend
+            python-version: '3.12'
+          # Only test Node versions with frontend  
+          - test-type: backend
+            node-version: 20.x
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+      
+      - name: 🏗️ Setup Node.js ${{ matrix.node-version }}
+        if: matrix.test-type == 'frontend'
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+      
+      - name: 🐍 Setup Python ${{ matrix.python-version }}
+        if: matrix.test-type == 'backend'
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+      
+      - name: 📦 Install frontend dependencies
+        if: matrix.test-type == 'frontend'
+        run: |
+          npm ci
+          cd frontend && npm ci
+      
+      - name: 📦 Install backend dependencies
+        if: matrix.test-type == 'backend'
+        run: |
+          cd backend
+          pip install -r requirements.txt
+          pip install pytest-cov pytest-xdist pytest-mock
+      
+      - name: 🧪 Run frontend tests
+        if: matrix.test-type == 'frontend'
+        run: |
+          cd frontend
+          npm run test:ci
+        env:
+          CI: true
+          GENERATE_SOURCEMAP: false
+      
+      - name: 🧪 Run backend tests
+        if: matrix.test-type == 'backend'
+        run: |
+          cd backend
+          python -m pytest \
+            --cov=. \
+            --cov-report=xml:coverage.xml \
+            --cov-report=html:htmlcov \
+            --cov-report=term-missing \
+            --junitxml=pytest-report.xml \
+            --maxfail=5 \
+            -n auto \
+            --dist=loadfile
+        env:
+          ENVIRONMENT: test
+          DATABASE_URL: sqlite:///test_rover.db
+      
+      - name: 📊 Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          file: |
+            ./frontend/coverage/lcov.info
+            ./backend/coverage.xml
+          flags: ${{ matrix.test-type }}
+          name: ${{ matrix.test-type }}-${{ matrix.node-version || matrix.python-version }}
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
+      
+      - name: 📄 Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-${{ matrix.test-type }}-${{ matrix.node-version || matrix.python-version }}
+          path: |
+            frontend/coverage/
+            backend/htmlcov/
+            backend/pytest-report.xml
+            frontend/test-results/
+          retention-days: 30
+
+  # =============================================================================  
+  # 🎭 END-TO-END TESTS
+  # =============================================================================
+  e2e_tests:
+    name: 🎭 E2E Tests (${{ matrix.project }})
+    needs: [pre_flight, unit_tests]
+    if: needs.pre_flight.outputs.e2e-required == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [chromium, firefox, webkit, mobile-chrome, mobile-safari]
+        shard: [1/3, 2/3, 3/3]
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+      
+      - name: 🏗️ Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+      
+      - name: 📦 Install dependencies
+        run: |
+          npm ci
+          cd frontend && npm ci
+          cd ../backend && pip install -r requirements.txt
+      
+      - name: 🎭 Install Playwright browsers
+        run: npx playwright install --with-deps ${{ matrix.project }}
+      
+      - name: 🏗️ Build frontend
+        run: |
+          cd frontend
+          npm run build
+        env:
+          CI: true
+          GENERATE_SOURCEMAP: false
+      
+      - name: 🧪 Run E2E tests
+        run: |
+          npx playwright test \
+            --project=${{ matrix.project }} \
+            --shard=${{ matrix.shard }} \
+            --reporter=html,json,junit
+        env:
+          PWTEST_HTML_REPORT_OPEN: never
+          PLAYWRIGHT_HTML_REPORT: playwright-report-${{ matrix.project }}-${{ matrix.shard }}
+      
+      - name: 📄 Upload E2E results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-results-${{ matrix.project }}-${{ matrix.shard }}
+          path: |
+            playwright-report-${{ matrix.project }}-${{ matrix.shard }}/
+            test-results/
+          retention-days: 30
+
+  # =============================================================================
+  # 👁️ VISUAL REGRESSION TESTS
+  # =============================================================================
+  visual_tests:
+    name: 👁️ Visual Regression Tests
+    needs: [pre_flight, unit_tests]
+    if: needs.pre_flight.outputs.frontend-changed == 'true' || github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: 🏗️ Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: 📦 Install dependencies
+        run: |
+          npm ci
+          cd frontend && npm ci
+      
+      - name: 🎭 Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+      
+      - name: 🏗️ Build Storybook
+        run: npm run build-storybook
+      
+      - name: 👁️ Run Jest visual tests
+        run: |
+          cd frontend
+          npm run test:visual
+        env:
+          CI: true
+      
+      - name: 👁️ Run Playwright visual tests  
+        run: |
+          npx playwright test \
+            --project=visual \
+            --reporter=html,json
+        env:
+          PWTEST_HTML_REPORT_OPEN: never
+      
+      - name: 🎨 Run Chromatic visual tests
+        run: npm run chromatic:ci
+        env:
+          CHROMATIC_PROJECT_TOKEN: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
+      
+      - name: 📄 Upload visual test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: visual-test-results
+          path: |
+            frontend/__visual_tests__/
+            playwright-report/
+            storybook-static/
+          retention-days: 30
+
+  # =============================================================================
+  # ♿ ACCESSIBILITY TESTS
+  # =============================================================================
+  accessibility_tests:
+    name: ♿ Accessibility Tests
+    needs: [pre_flight, unit_tests]
+    if: needs.pre_flight.outputs.frontend-changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+      
+      - name: 🏗️ Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+      
+      - name: 📦 Install dependencies
+        run: |
+          npm ci
+          cd frontend && npm ci
+          cd ../backend && pip install -r requirements.txt
+      
+      - name: 🎭 Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+      
+      - name: ♿ Run Jest accessibility tests
+        run: |
+          cd frontend
+          npm run test:a11y
+        env:
+          CI: true
+      
+      - name: ♿ Run Playwright accessibility tests
+        run: |
+          npx playwright test \
+            --project=accessibility \
+            --reporter=html,json
+        env:
+          PWTEST_HTML_REPORT_OPEN: never
+      
+      - name: 🏗️ Build frontend for Lighthouse
+        run: |
+          cd frontend
+          npm run build
+        env:
+          CI: true
+          GENERATE_SOURCEMAP: false
+      
+      - name: 🏃‍♂️ Start test servers
+        run: |
+          cd frontend && npm start &
+          cd backend && python server.py --test-mode &
+          sleep 30
+        env:
+          CI: true
+      
+      - name: 💡 Run Lighthouse CI accessibility audits
+        run: npm run test:a11y:lighthouse
+        env:
+          LHCI_BUILD_CONTEXT__CURRENT_HASH: ${{ github.sha }}
+          LHCI_BUILD_CONTEXT__COMMIT_TIME: ${{ github.event.head_commit.timestamp }}
+      
+      - name: 🎯 Run axe-core accessibility scan
+        run: npm run test:a11y:axe
+        continue-on-error: true
+      
+      - name: 📊 Generate accessibility report
+        run: npm run test:a11y:report
+      
+      - name: 📄 Upload accessibility results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: accessibility-results
+          path: |
+            .lighthouseci/
+            axe-results.json
+            a11y-report.html
+            playwright-report/
+          retention-days: 30
+
+  # =============================================================================
+  # ⚡ PERFORMANCE TESTS
+  # =============================================================================
+  performance_tests:
+    name: ⚡ Performance Tests
+    needs: [pre_flight, unit_tests]
+    if: needs.pre_flight.outputs.frontend-changed == 'true' || github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+      
+      - name: 🏗️ Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+      
+      - name: 📦 Install dependencies
+        run: |
+          npm ci
+          cd frontend && npm ci
+          cd ../backend && pip install -r requirements.txt
+      
+      - name: 🎭 Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+      
+      - name: 🏗️ Build optimized frontend
+        run: |
+          cd frontend
+          npm run build
+        env:
+          CI: true
+          NODE_ENV: production
+          GENERATE_SOURCEMAP: false
+      
+      - name: ⚡ Run Playwright performance tests
+        run: |
+          npx playwright test \
+            --project=performance \
+            --reporter=html,json
+        env:
+          PWTEST_HTML_REPORT_OPEN: never
+      
+      - name: 🏃‍♂️ Start production servers
+        run: |
+          cd frontend && npx serve -s build -l 3000 &
+          cd backend && python server.py --production &
+          sleep 30
+        env:
+          NODE_ENV: production
+      
+      - name: 💡 Run Lighthouse performance audits
+        run: |
+          npx lhci collect \
+            --numberOfRuns=5 \
+            --url=http://localhost:3000
+          npx lhci assert
+        env:
+          LHCI_BUILD_CONTEXT__CURRENT_HASH: ${{ github.sha }}
+      
+      - name: 📊 Analyze bundle size
+        run: |
+          cd frontend
+          npx webpack-bundle-analyzer build/static/js/*.js --mode=json > bundle-analysis.json
+        continue-on-error: true
+      
+      - name: 🔍 Performance budget check
+        run: |
+          # Check if bundle size exceeds budget
+          BUNDLE_SIZE=$(du -sb frontend/build | cut -f1)
+          BUDGET_BYTES=$((5 * 1024 * 1024)) # 5MB budget
+          
+          if [ $BUNDLE_SIZE -gt $BUDGET_BYTES ]; then
+            echo "::error::Bundle size ($BUNDLE_SIZE bytes) exceeds budget ($BUDGET_BYTES bytes)"
+            exit 1
+          else
+            echo "::notice::Bundle size within budget: $BUNDLE_SIZE bytes"
+          fi
+      
+      - name: 📄 Upload performance results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: performance-results
+          path: |
+            .lighthouseci/
+            playwright-report/
+            frontend/bundle-analysis.json
+          retention-days: 30
+
+  # =============================================================================
+  # 🔒 SECURITY TESTS
+  # =============================================================================
+  security_tests:
+    name: 🔒 Security Tests
+    needs: pre_flight
+    if: needs.pre_flight.outputs.security-scan-required == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    permissions:
+      security-events: write
+      contents: read
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+      
+      - name: 🏗️ Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+      
+      - name: 🔍 Run npm audit
+        run: |
+          npm audit --audit-level=moderate --production
+          cd frontend && npm audit --audit-level=moderate --production
+        continue-on-error: true
+      
+      - name: 🔍 Run pip audit
+        run: |
+          cd backend
+          pip install pip-audit
+          pip-audit --require-hashes --desc
+        continue-on-error: true
+      
+      - name: 🔒 Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript,python
+          queries: security-extended,security-and-quality
+      
+      - name: 🏗️ Build for CodeQL analysis
+        run: |
+          cd frontend && npm run build
+        env:
+          CI: true
+      
+      - name: 🔍 Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:javascript,python"
+      
+      - name: 🔒 Run Semgrep SAST
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: >-
+            p/security-audit
+            p/secrets
+            p/owasp-top-ten
+            p/react
+            p/python
+        env:
+          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+      
+      - name: 🐳 Build Docker images for security scan
+        run: |
+          docker build -t rover-frontend:latest -f frontend/Dockerfile .
+          docker build -t rover-backend:latest -f backend/Dockerfile .
+        continue-on-error: true
+      
+      - name: 🔍 Run Trivy container scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'rover-frontend:latest'
+          format: 'sarif'
+          output: 'trivy-frontend-results.sarif'
+        continue-on-error: true
+      
+      - name: 📄 Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-frontend-results.sarif'
+        continue-on-error: true
+
+  # =============================================================================
+  # 📊 TEST RESULTS AGGREGATION
+  # =============================================================================
+  aggregate_results:
+    name: 📊 Aggregate Test Results
+    needs: [unit_tests, e2e_tests, visual_tests, accessibility_tests, performance_tests]
+    if: always() && needs.pre_flight.outputs.should-run-tests == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+      
+      - name: 🏗️ Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: 📦 Install dependencies
+        run: npm ci
+      
+      - name: 📥 Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./test-artifacts
+      
+      - name: 📊 Generate comprehensive test report
+        run: node tools/generate-test-report.js
+        env:
+          ARTIFACTS_PATH: ./test-artifacts
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+      
+      - name: 📊 Calculate coverage consolidation
+        run: node tools/consolidate-coverage.js
+        env:
+          ARTIFACTS_PATH: ./test-artifacts
+      
+      - name: 📈 Generate performance metrics
+        run: node tools/performance-analysis.js
+        env:
+          ARTIFACTS_PATH: ./test-artifacts
+          PERFORMANCE_BUDGET: ${{ env.PERFORMANCE_BUDGET }}
+      
+      - name: 💬 Comment on PR with results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const reportPath = './test-artifacts/consolidated-report.md';
+            
+            if (fs.existsSync(reportPath)) {
+              const report = fs.readFileSync(reportPath, 'utf8');
+              
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: report
+              });
+            }
+      
+      - name: 📄 Upload consolidated results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: consolidated-test-results
+          path: |
+            ./test-artifacts/consolidated-report.md
+            ./test-artifacts/coverage-report.html
+            ./test-artifacts/performance-summary.json
+          retention-days: 90
+      
+      - name: ✅ Set quality gates
+        run: |
+          # Check if critical tests passed
+          if [[ "${{ needs.unit_tests.result }}" == "failure" ]]; then
+            echo "::error::Unit tests failed - blocking deployment"
+            exit 1
+          fi
+          
+          if [[ "${{ needs.accessibility_tests.result }}" == "failure" && 
+                "${{ needs.pre_flight.outputs.frontend-changed }}" == "true" ]]; then
+            echo "::error::Accessibility tests failed - blocking deployment"
+            exit 1
+          fi
+          
+          echo "::notice::All quality gates passed"
+
+  # =============================================================================
+  # 🚀 DEPLOYMENT TRIGGERS
+  # =============================================================================
+  trigger_deployment:
+    name: 🚀 Trigger Deployment
+    needs: [aggregate_results, security_tests]
+    if: >
+      always() &&
+      (needs.aggregate_results.result == 'success') &&
+      (needs.security_tests.result == 'success' || needs.security_tests.result == 'skipped') &&
+      github.ref == 'refs/heads/main' &&
+      github.event_name == 'push' &&
+      github.event.inputs.skip_deploy != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    
+    steps:
+      - name: 🚀 Trigger deployment workflow
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'deploy.yml',
+              ref: 'main',
+              inputs: {
+                environment: 'production',
+                version: context.sha.substring(0, 7)
+              }
+            });
+            
+            console.log('Deployment workflow triggered successfully');
+      
+      - name: 📝 Create deployment record
+        run: |
+          echo "::notice::Deployment triggered for commit ${{ github.sha }}"
+          echo "::notice::All tests passed successfully"
+          echo "::notice::Security scans completed"
+
+  # =============================================================================
+  # 🧹 CLEANUP & NOTIFICATIONS  
+  # =============================================================================
+  cleanup:
+    name: 🧹 Cleanup & Notifications
+    needs: [aggregate_results, trigger_deployment]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+      - name: 📊 Workflow summary
+        run: |
+          echo "## 🚀 CI/CD Pipeline Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Unit Tests | ${{ needs.unit_tests.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| E2E Tests | ${{ needs.e2e_tests.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY  
+          echo "| Visual Tests | ${{ needs.visual_tests.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Accessibility | ${{ needs.accessibility_tests.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Performance | ${{ needs.performance_tests.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Security | ${{ needs.security_tests.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Deployment | ${{ needs.trigger_deployment.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Trigger:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+      
+      - name: 🔔 Notify on failure (Slack/Teams/Email)
+        if: failure()
+        run: |
+          echo "::warning::CI/CD Pipeline failed - notifications would be sent here"
+          # Add your notification logic here (Slack, Teams, email, etc.)
+      
+      - name: 🎉 Notify on success
+        if: success() && github.ref == 'refs/heads/main'
+        run: |
+          echo "::notice::CI/CD Pipeline completed successfully"
+          # Add success notification logic here

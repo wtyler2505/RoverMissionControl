@@ -1,0 +1,431 @@
+# Test Quality Gates and PR Status Checks
+# Lightweight workflow for fast PR feedback on essential quality metrics
+name: 🛡️ Quality Gates
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+    types: [opened, synchronize, reopened]
+  
+  # Allow manual triggering for testing
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR number to check'
+        required: false
+        type: string
+
+env:
+  NODE_VERSION: '18.x'
+  PYTHON_VERSION: '3.11'
+
+# Ensure only one quality gates check runs per PR
+concurrency:
+  group: quality-gates-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # =============================================================================
+  # 🏃‍♂️ FAST QUALITY CHECKS (< 5 minutes)
+  # =============================================================================
+  quick_checks:
+    name: 🏃‍♂️ Quick Quality Checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    outputs:
+      lint-status: ${{ steps.lint.outcome }}
+      type-check-status: ${{ steps.typecheck.outcome }}
+      unit-tests-status: ${{ steps.unit.outcome }}
+      security-basic-status: ${{ steps.security.outcome }}
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: 🏗️ Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+      
+      - name: 📦 Install dependencies
+        run: |
+          npm ci
+          cd frontend && npm ci
+          cd ../backend && pip install -r requirements.txt
+      
+      - name: 🧹 Lint check
+        id: lint
+        run: |
+          echo "::group::Frontend Linting"
+          cd frontend && npm run lint
+          echo "::endgroup::"
+          
+          echo "::group::Backend Linting"
+          cd backend && python -m flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          echo "::endgroup::"
+        continue-on-error: true
+      
+      - name: 🔍 Type checking
+        id: typecheck
+        run: |
+          echo "::group::TypeScript Type Checking"
+          cd frontend && npx tsc --noEmit
+          echo "::endgroup::"
+        continue-on-error: true
+      
+      - name: 🧪 Unit tests (fast)
+        id: unit
+        run: |
+          echo "::group::Frontend Unit Tests"
+          cd frontend && npm test -- --coverage=false --watchAll=false --passWithNoTests
+          echo "::endgroup::"
+          
+          echo "::group::Backend Unit Tests"
+          cd backend && python -m pytest -x --ff -q tests/
+          echo "::endgroup::"
+        continue-on-error: true
+      
+      - name: 🔒 Basic security checks
+        id: security
+        run: |
+          echo "::group::NPM Audit"
+          npm audit --audit-level=high --production || echo "NPM audit found issues"
+          echo "::endgroup::"
+          
+          echo "::group::Python Safety Check"
+          cd backend && pip install safety && safety check || echo "Safety check found issues"
+          echo "::endgroup::"
+        continue-on-error: true
+
+  # =============================================================================
+  # 📊 COVERAGE GATES (< 10 minutes)
+  # =============================================================================
+  coverage_gates:
+    name: 📊 Coverage Quality Gates
+    needs: quick_checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    outputs:
+      frontend-coverage: ${{ steps.frontend-cov.outputs.coverage }}
+      backend-coverage: ${{ steps.backend-cov.outputs.coverage }}
+      overall-coverage: ${{ steps.overall-cov.outputs.coverage }}
+      coverage-gate-passed: ${{ steps.gate-check.outputs.passed }}
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+      
+      - name: 🏗️ Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+      
+      - name: 📦 Install dependencies
+        run: |
+          npm ci
+          cd frontend && npm ci
+          cd ../backend && pip install -r requirements.txt pytest-cov
+      
+      - name: 🧪 Frontend coverage
+        id: frontend-cov
+        run: |
+          cd frontend
+          npm test -- --coverage --watchAll=false --passWithNoTests
+          
+          # Extract coverage percentage
+          COVERAGE=$(node -e "
+            const fs = require('fs');
+            const coverage = JSON.parse(fs.readFileSync('coverage/coverage-summary.json', 'utf8'));
+            console.log(coverage.total.lines.pct);
+          ")
+          
+          echo "coverage=$COVERAGE" >> $GITHUB_OUTPUT
+          echo "Frontend coverage: $COVERAGE%"
+        env:
+          CI: true
+      
+      - name: 🐍 Backend coverage
+        id: backend-cov
+        run: |
+          cd backend
+          python -m pytest --cov=. --cov-report=json --cov-report=term-missing
+          
+          # Extract coverage percentage
+          COVERAGE=$(python -c "
+            import json
+            with open('coverage.json', 'r') as f:
+                data = json.load(f)
+            print(data['totals']['percent_covered'])
+          ")
+          
+          echo "coverage=$COVERAGE" >> $GITHUB_OUTPUT
+          echo "Backend coverage: $COVERAGE%"
+        env:
+          ENVIRONMENT: test
+      
+      - name: 📊 Calculate overall coverage
+        id: overall-cov
+        run: |
+          FRONTEND_COV=${{ steps.frontend-cov.outputs.coverage }}
+          BACKEND_COV=${{ steps.backend-cov.outputs.coverage }}
+          
+          # Simple average (could be weighted by LOC in production)
+          OVERALL=$(echo "scale=1; ($FRONTEND_COV + $BACKEND_COV) / 2" | bc)
+          
+          echo "coverage=$OVERALL" >> $GITHUB_OUTPUT
+          echo "Overall coverage: $OVERALL%"
+      
+      - name: 🚧 Coverage gate check
+        id: gate-check
+        run: |
+          THRESHOLD=80
+          OVERALL_COV=${{ steps.overall-cov.outputs.coverage }}
+          
+          if (( $(echo "$OVERALL_COV >= $THRESHOLD" | bc -l) )); then
+            echo "✅ Coverage gate passed: $OVERALL_COV% >= $THRESHOLD%"
+            echo "passed=true" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Coverage gate failed: $OVERALL_COV% < $THRESHOLD%"
+            echo "passed=false" >> $GITHUB_OUTPUT
+          fi
+
+  # =============================================================================
+  # 📈 PR STATUS UPDATE
+  # =============================================================================
+  update_pr_status:
+    name: 📈 Update PR Status
+    needs: [quick_checks, coverage_gates]
+    if: always() && github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    
+    steps:
+      - name: 📊 Calculate overall status
+        id: status
+        run: |
+          # Check individual gate results
+          LINT_STATUS="${{ needs.quick_checks.outputs.lint-status }}"
+          TYPE_STATUS="${{ needs.quick_checks.outputs.type-check-status }}"
+          UNIT_STATUS="${{ needs.quick_checks.outputs.unit-tests-status }}"
+          SECURITY_STATUS="${{ needs.quick_checks.outputs.security-basic-status }}"
+          COVERAGE_PASSED="${{ needs.coverage_gates.outputs.coverage-gate-passed }}"
+          
+          # Count failures
+          FAILURES=0
+          WARNINGS=0
+          
+          [[ "$LINT_STATUS" == "failure" ]] && ((FAILURES++))
+          [[ "$TYPE_STATUS" == "failure" ]] && ((FAILURES++))
+          [[ "$UNIT_STATUS" == "failure" ]] && ((FAILURES++))
+          [[ "$SECURITY_STATUS" == "failure" ]] && ((WARNINGS++))
+          [[ "$COVERAGE_PASSED" == "false" ]] && ((FAILURES++))
+          
+          # Determine overall status
+          if [[ $FAILURES -gt 0 ]]; then
+            OVERALL_STATUS="failure"
+            STATUS_ICON="❌"
+          elif [[ $WARNINGS -gt 0 ]]; then
+            OVERALL_STATUS="success"
+            STATUS_ICON="⚠️"
+          else
+            OVERALL_STATUS="success"
+            STATUS_ICON="✅"
+          fi
+          
+          echo "status=$OVERALL_STATUS" >> $GITHUB_OUTPUT
+          echo "icon=$STATUS_ICON" >> $GITHUB_OUTPUT
+          echo "failures=$FAILURES" >> $GITHUB_OUTPUT
+          echo "warnings=$WARNINGS" >> $GITHUB_OUTPUT
+      
+      - name: 💬 Create PR comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const status = '${{ steps.status.outputs.status }}';
+            const icon = '${{ steps.status.outputs.icon }}';
+            const failures = '${{ steps.status.outputs.failures }}';
+            const warnings = '${{ steps.status.outputs.warnings }}';
+            
+            const frontendCov = '${{ needs.coverage_gates.outputs.frontend-coverage }}';
+            const backendCov = '${{ needs.coverage_gates.outputs.backend-coverage }}';
+            const overallCov = '${{ needs.coverage_gates.outputs.overall-coverage }}';
+            
+            const lintStatus = '${{ needs.quick_checks.outputs.lint-status }}';
+            const typeStatus = '${{ needs.quick_checks.outputs.type-check-status }}';
+            const unitStatus = '${{ needs.quick_checks.outputs.unit-tests-status }}';
+            const securityStatus = '${{ needs.quick_checks.outputs.security-basic-status }}';
+            
+            const getStatusIcon = (status) => {
+              switch(status) {
+                case 'success': return '✅';
+                case 'failure': return '❌';
+                case 'cancelled': return '⏹️';
+                case 'skipped': return '⏭️';
+                default: return '❓';
+              }
+            };
+            
+            const comment = `## ${icon} Quality Gates Report
+            
+            ### 📊 Quick Summary
+            - **Overall Status**: ${status === 'success' ? 'PASSED' : 'FAILED'}
+            - **Issues Found**: ${failures} failures, ${warnings} warnings
+            - **Overall Coverage**: ${overallCov}%
+            
+            ### 🔍 Detailed Results
+            | Check | Status | Details |
+            |-------|--------|---------|
+            | **Linting** | ${getStatusIcon(lintStatus)} ${lintStatus} | Code style and formatting |
+            | **Type Checking** | ${getStatusIcon(typeStatus)} ${typeStatus} | TypeScript type validation |
+            | **Unit Tests** | ${getStatusIcon(unitStatus)} ${unitStatus} | Core functionality tests |
+            | **Security Scan** | ${getStatusIcon(securityStatus)} ${securityStatus} | Dependency vulnerabilities |
+            | **Coverage Gate** | ${overallCov >= 80 ? '✅' : '❌'} ${overallCov >= 80 ? 'passed' : 'failed'} | ${overallCov}% (threshold: 80%) |
+            
+            ### 📈 Coverage Breakdown
+            - **Frontend**: ${frontendCov}%
+            - **Backend**: ${backendCov}%
+            - **Overall**: ${overallCov}%
+            
+            ${status === 'failure' ? `
+            ### ⚠️ Action Required
+            This PR has failing quality gates that must be addressed before merging:
+            ${lintStatus === 'failure' ? '- Fix linting errors\n' : ''}
+            ${typeStatus === 'failure' ? '- Resolve type checking issues\n' : ''}
+            ${unitStatus === 'failure' ? '- Fix failing unit tests\n' : ''}
+            ${overallCov < 80 ? '- Increase test coverage to meet 80% threshold\n' : ''}
+            ` : `
+            ### 🎉 Ready for Review
+            All quality gates are passing! This PR is ready for code review.
+            `}
+            
+            ---
+            *Updated automatically by Quality Gates workflow*`;
+            
+            // Find existing comment to update or create new one
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            
+            const existingComment = comments.find(comment => 
+              comment.body.includes('Quality Gates Report')
+            );
+            
+            if (existingComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existingComment.id,
+                body: comment
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: comment
+              });
+            }
+      
+      - name: 🎯 Set PR status checks
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const status = '${{ steps.status.outputs.status }}';
+            const sha = context.payload.pull_request?.head?.sha || context.sha;
+            
+            // Set individual status checks
+            const checks = [
+              { context: 'quality-gates/lint', state: '${{ needs.quick_checks.outputs.lint-status }}' },
+              { context: 'quality-gates/typecheck', state: '${{ needs.quick_checks.outputs.type-check-status }}' },
+              { context: 'quality-gates/unit-tests', state: '${{ needs.quick_checks.outputs.unit-tests-status }}' },
+              { context: 'quality-gates/coverage', state: '${{ needs.coverage_gates.outputs.coverage-gate-passed }}' === 'true' ? 'success' : 'failure' }
+            ];
+            
+            for (const check of checks) {
+              const state = check.state === 'success' ? 'success' : 'failure';
+              
+              await github.rest.repos.createCommitStatus({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                sha: sha,
+                state: state,
+                context: check.context,
+                description: `${check.context.split('/')[1]} ${state}`
+              });
+            }
+            
+            // Set overall status
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: sha,
+              state: status,
+              context: 'quality-gates',
+              description: `Quality gates ${status === 'success' ? 'passed' : 'failed'}`
+            });
+
+  # =============================================================================
+  # 🚧 QUALITY GATE ENFORCEMENT
+  # =============================================================================
+  enforce_gates:
+    name: 🚧 Enforce Quality Gates
+    needs: [quick_checks, coverage_gates]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    
+    steps:
+      - name: 🚧 Enforce gates
+        run: |
+          LINT_STATUS="${{ needs.quick_checks.outputs.lint-status }}"
+          TYPE_STATUS="${{ needs.quick_checks.outputs.type-check-status }}"
+          UNIT_STATUS="${{ needs.quick_checks.outputs.unit-tests-status }}"
+          COVERAGE_PASSED="${{ needs.coverage_gates.outputs.coverage-gate-passed }}"
+          
+          echo "🔍 Quality Gates Status:"
+          echo "  Linting: $LINT_STATUS"
+          echo "  Type Checking: $TYPE_STATUS" 
+          echo "  Unit Tests: $UNIT_STATUS"
+          echo "  Coverage Gate: $COVERAGE_PASSED"
+          
+          # Fail if any critical gates fail
+          if [[ "$LINT_STATUS" == "failure" ]]; then
+            echo "❌ Linting must pass"
+            exit 1
+          fi
+          
+          if [[ "$TYPE_STATUS" == "failure" ]]; then
+            echo "❌ Type checking must pass"
+            exit 1
+          fi
+          
+          if [[ "$UNIT_STATUS" == "failure" ]]; then
+            echo "❌ Unit tests must pass"
+            exit 1
+          fi
+          
+          if [[ "$COVERAGE_PASSED" == "false" ]]; then
+            echo "❌ Coverage threshold must be met"
+            exit 1
+          fi
+          
+          echo "✅ All quality gates passed!"

@@ -1,0 +1,117 @@
+{
+  "projectToken": "CHROMATIC_PROJECT_TOKEN",
+  "buildScriptName": "build-storybook",
+  "storybookBuildDir": "storybook-static",
+  "exitZeroOnChanges": true,
+  "exitOnceUploaded": true,
+  "autoAcceptChanges": false,
+  "ignoreLastBuildOnBranch": "main",
+  "skip": "dependabot/**",
+  "externals": [
+    "packages/design-tokens/dist/**"
+  ],
+  "fileHashing": true,
+  "zip": true,
+  "uploadMetadata": true,
+  "diagnostics": false,
+  "debug": false,
+  "interactive": false,
+  "junitReport": true,
+  "junitReportFile": "chromatic-junit.xml",
+  "logFile": "chromatic.log",
+  "onlyChanged": true,
+  "preserveMissing": false,
+  "storybookLogFile": "storybook.log",
+  "traceChanged": "first-commit",
+  "untraced": [
+    "**/*.md",
+    "**/*.txt",
+    ".env*",
+    "*.config.js"
+  ],
+  "threshold": 0.063,
+  "diffThreshold": 0.2,
+  "allowConsoleErrors": false,
+  "ignoreLastBuildOnBranch": ["main", "master", "develop"],
+  "list": true,
+  "storybookConfigDir": ".storybook",
+  "forceRebuild": false,
+  "fromCI": true,
+  "isLocalBuild": false,
+  "only": [
+    "frontend/src/components/HAL/**/*.stories.*",
+    "frontend/src/components/WebSocket/**/*.stories.*",
+    "frontend/src/components/Telemetry/**/*.stories.*",
+    "frontend/src/components/Dashboard/**/*.stories.*",
+    "stories/**/*.stories.*"
+  ],
+  "onlyStoryNames": [],
+  "onlyStoryFiles": [],
+  "splitByStory": true,
+  "upgradeTimeout": 600000,
+  "uploadTimeout": 600000,
+  "branchName": "",
+  "patchBuild": "",
+  "repositorySlug": "",
+  "ownerName": "",
+  "sha": "",
+  "originalArgv": [],
+  "githubToken": "",
+  "gitUserEmail": "",
+  "gitUserName": "",
+  "isChromatic": true,
+  "isPublishOnly": false,
+  "localDir": ".",
+  "outputDir": "chromatic-output",
+  "packageJson": "package.json",
+  "storybookBuildDir": "storybook-static",
+  "allowConsoleErrors": false,
+  "ifBelowThreshold": "warn",
+  "ifOverThreshold": "fail",
+  "chromatic": {
+    "disableSnapshot": false,
+    "delay": 300,
+    "diffThreshold": 0.2,
+    "forcedColors": "active",
+    "modes": {
+      "light": {
+        "backgrounds": {
+          "value": "#ffffff"
+        },
+        "theme": "light"
+      },
+      "dark": {
+        "backgrounds": {
+          "value": "#1a1a1a"
+        },
+        "theme": "dark"
+      },
+      "mobile": {
+        "viewport": {
+          "width": 375,
+          "height": 667
+        }
+      },
+      "tablet": {
+        "viewport": {
+          "width": 768,
+          "height": 1024
+        }
+      },
+      "desktop": {
+        "viewport": {
+          "width": 1200,
+          "height": 800
+        }
+      },
+      "high-contrast": {
+        "backgrounds": {
+          "value": "#000000"
+        },
+        "globals": {
+          "contrast": "high"
+        }
+      }
+    }
+  }
+}

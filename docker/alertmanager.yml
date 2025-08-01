@@ -1,0 +1,121 @@
+# AlertManager configuration for security alerts
+global:
+  resolve_timeout: 5m
+  smtp_from: 'rover-security@example.com'
+  smtp_smarthost: 'smtp.example.com:587'
+  smtp_auth_username: 'rover-security@example.com'
+  smtp_auth_password: 'smtp_password'
+  smtp_require_tls: true
+
+# Templates for alert formatting
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+# Route tree for alert routing
+route:
+  group_by: ['alertname', 'cluster', 'service']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 1h
+  receiver: 'security-team'
+  
+  routes:
+    # Critical security alerts
+    - match:
+        severity: critical
+        category: security
+      receiver: 'security-critical'
+      continue: true
+      
+    # High severity vulnerabilities
+    - match:
+        severity: high
+        alert_type: vulnerability
+      receiver: 'security-high'
+      group_wait: 30s
+      
+    # Policy violations
+    - match:
+        alert_type: policy_violation
+      receiver: 'compliance-team'
+      
+    # SBOM updates
+    - match:
+        alert_type: sbom_update
+      receiver: 'dependency-track'
+
+# Receivers configuration
+receivers:
+  - name: 'security-team'
+    email_configs:
+      - to: 'security@example.com'
+        headers:
+          Subject: 'Rover Security Alert: {{ .GroupLabels.alertname }}'
+        html: |
+          <h2>🚨 Security Alert</h2>
+          <p><strong>Alert:</strong> {{ .GroupLabels.alertname }}</p>
+          <p><strong>Severity:</strong> {{ .CommonLabels.severity }}</p>
+          <p><strong>Summary:</strong> {{ .CommonAnnotations.summary }}</p>
+          <p><strong>Description:</strong> {{ .CommonAnnotations.description }}</p>
+          <h3>Details:</h3>
+          <ul>
+          {{ range .Alerts }}
+            <li>
+              <strong>{{ .Labels.instance }}</strong><br>
+              {{ .Annotations.description }}<br>
+              <em>Started at: {{ .StartsAt.Format "2006-01-02 15:04:05" }}</em>
+            </li>
+          {{ end }}
+          </ul>
+    
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#rover-security'
+        title: 'Security Alert: {{ .GroupLabels.alertname }}'
+        text: '{{ .CommonAnnotations.summary }}'
+        
+  - name: 'security-critical'
+    pagerduty_configs:
+      - service_key: '${PAGERDUTY_SERVICE_KEY}'
+        description: 'CRITICAL Security Issue: {{ .GroupLabels.alertname }}'
+        details:
+          severity: '{{ .CommonLabels.severity }}'
+          component: '{{ .CommonLabels.component }}'
+          
+    email_configs:
+      - to: 'security-critical@example.com,ciso@example.com'
+        headers:
+          Subject: '🔴 CRITICAL Security Alert: {{ .GroupLabels.alertname }}'
+          Priority: 'urgent'
+          
+  - name: 'security-high'
+    email_configs:
+      - to: 'security@example.com'
+        headers:
+          Subject: '🟠 High Security Alert: {{ .GroupLabels.alertname }}'
+          
+  - name: 'compliance-team'
+    email_configs:
+      - to: 'compliance@example.com'
+        headers:
+          Subject: 'Policy Violation: {{ .GroupLabels.policy }}'
+          
+  - name: 'dependency-track'
+    webhook_configs:
+      - url: 'http://dependency-track:8080/api/v1/notification/webhook'
+        http_config:
+          bearer_token: '${DEPENDENCY_TRACK_WEBHOOK_TOKEN}'
+
+# Inhibition rules to prevent alert storms
+inhibit_rules:
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'instance']
+    
+  - source_match:
+      alertname: 'SecurityScannerDown'
+    target_match:
+      alert_type: 'vulnerability'
+    equal: ['instance']

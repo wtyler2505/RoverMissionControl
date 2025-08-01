@@ -1,0 +1,7 @@
+/*
+ * Rover Mission Control System
+ * Copyright (c) 2024 Rover Mission Control Team
+ * 
+ * This file is part of the Rover Mission Control System.
+ * Unauthorized copying or distribution is prohibited.
+ */

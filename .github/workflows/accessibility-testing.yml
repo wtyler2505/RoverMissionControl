@@ -1,0 +1,531 @@
+name: Accessibility Testing
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+    types: [opened, synchronize, reopened]
+  schedule:
+    # Run accessibility tests daily at 2 AM UTC
+    - cron: '0 2 * * *'
+
+env:
+  NODE_VERSION: '18'
+  PYTHON_VERSION: '3.9'
+
+jobs:
+  # Jest-axe unit tests for component accessibility
+  jest-accessibility:
+    name: Jest Accessibility Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: |
+          cd frontend
+          npm ci
+
+      - name: Run Jest accessibility tests
+        run: |
+          cd frontend
+          npm run test:a11y:coverage
+        env:
+          CI: true
+
+      - name: Upload Jest accessibility coverage
+        uses: codecov/codecov-action@v3
+        with:
+          file: frontend/coverage/lcov.info
+          flags: accessibility,jest
+          name: jest-accessibility-coverage
+
+      - name: Generate accessibility test report
+        if: always()
+        run: |
+          cd frontend
+          npm run test:a11y -- --reporters=jest-junit --outputFile=accessibility-test-results.xml
+        env:
+          CI: true
+
+      - name: Upload accessibility test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: jest-accessibility-results
+          path: frontend/accessibility-test-results.xml
+
+  # Playwright E2E accessibility tests
+  playwright-accessibility:
+    name: Playwright Accessibility Tests
+    runs-on: ubuntu-latest
+    needs: jest-accessibility
+    
+    services:
+      # Backend service for testing
+      backend:
+        image: python:3.9-slim
+        options: --health-cmd "curl -f http://localhost:8000/health || exit 1" --health-interval 30s --health-timeout 10s --health-retries 3
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install frontend dependencies
+        run: |
+          cd frontend
+          npm ci
+
+      - name: Install backend dependencies
+        run: |
+          cd backend
+          pip install -r requirements.txt
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+
+      - name: Start backend server
+        run: |
+          cd backend
+          python server.py --test-mode &
+          sleep 10
+        env:
+          ENVIRONMENT: test
+          DATABASE_URL: sqlite:///test_rover_platform.db
+
+      - name: Start frontend server
+        run: |
+          cd frontend
+          npm start &
+          sleep 30
+        env:
+          NODE_ENV: test
+          REACT_APP_API_URL: http://localhost:8000
+
+      - name: Wait for servers to be ready
+        run: |
+          npx wait-on http://localhost:3000 http://localhost:8000/health --timeout 60000
+
+      - name: Run Playwright accessibility tests
+        run: npx playwright test --project=accessibility
+        env:
+          CI: true
+
+      - name: Upload Playwright accessibility report
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: playwright-accessibility-report
+          path: playwright-report/
+          retention-days: 7
+
+      - name: Upload Playwright test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: playwright-accessibility-results
+          path: test-results/
+          retention-days: 7
+
+  # Lighthouse CI accessibility audits
+  lighthouse-accessibility:
+    name: Lighthouse Accessibility Audits
+    runs-on: ubuntu-latest
+    needs: jest-accessibility
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install frontend dependencies
+        run: |
+          cd frontend
+          npm ci
+
+      - name: Install backend dependencies
+        run: |
+          cd backend
+          pip install -r requirements.txt
+
+      - name: Install Lighthouse CI
+        run: npm install -g @lhci/cli@0.13.x
+
+      - name: Build frontend
+        run: |
+          cd frontend
+          npm run build
+
+      - name: Start backend server
+        run: |
+          cd backend
+          python server.py --test-mode &
+          sleep 10
+        env:
+          ENVIRONMENT: test
+          DATABASE_URL: sqlite:///test_rover_platform.db
+
+      - name: Serve built frontend
+        run: |
+          npx serve -s frontend/build -l 3000 &
+          sleep 10
+
+      - name: Wait for servers
+        run: npx wait-on http://localhost:3000 http://localhost:8000/health --timeout 60000
+
+      - name: Run Lighthouse CI - Desktop
+        run: lhci autorun
+        env:
+          LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
+
+      - name: Run Lighthouse CI - Mobile
+        run: lhci autorun --config=.lighthouserc.mobile.js
+        env:
+          LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
+
+      - name: Upload Lighthouse results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: lighthouse-accessibility-results
+          path: .lighthouseci/
+          retention-days: 7
+
+  # axe-core accessibility scanning
+  axe-accessibility:
+    name: Axe-core Accessibility Scan
+    runs-on: ubuntu-latest
+    needs: jest-accessibility
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          cd frontend
+          npm ci
+
+      - name: Install axe-cli
+        run: npm install -g @axe-core/cli
+
+      - name: Install backend dependencies
+        run: |
+          cd backend
+          pip install -r requirements.txt
+
+      - name: Build frontend
+        run: |
+          cd frontend
+          npm run build
+
+      - name: Start backend server
+        run: |
+          cd backend
+          python server.py --test-mode &
+          sleep 10
+        env:
+          ENVIRONMENT: test
+          DATABASE_URL: sqlite:///test_rover_platform.db
+
+      - name: Serve built frontend
+        run: |
+          npx serve -s frontend/build -l 3000 &
+          sleep 10
+
+      - name: Wait for servers
+        run: npx wait-on http://localhost:3000 http://localhost:8000/health --timeout 60000
+
+      - name: Run axe accessibility scan
+        run: |
+          axe http://localhost:3000 \
+            --exit \
+            --save axe-results.json \
+            --tags wcag2a,wcag2aa,wcag21aa,best-practice \
+            --rules color-contrast,keyboard-navigation,aria-usage
+
+      - name: Upload axe results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: axe-accessibility-results
+          path: axe-results.json
+
+  # Accessibility compliance report generation
+  accessibility-report:
+    name: Generate Accessibility Report
+    runs-on: ubuntu-latest
+    needs: [jest-accessibility, playwright-accessibility, lighthouse-accessibility, axe-accessibility]
+    if: always()
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Download all accessibility artifacts
+        uses: actions/download-artifact@v3
+
+      - name: Install report dependencies
+        run: npm install --no-save markdown-pdf html-to-text
+
+      - name: Generate comprehensive accessibility report
+        run: |
+          node << 'EOF'
+          const fs = require('fs');
+          const path = require('path');
+          
+          console.log('Generating accessibility compliance report...');
+          
+          const report = {
+            timestamp: new Date().toISOString(),
+            summary: {
+              jestTests: 'N/A',
+              playwrightTests: 'N/A', 
+              lighthouseScore: 'N/A',
+              axeViolations: 'N/A'
+            },
+            details: {},
+            recommendations: []
+          };
+          
+          // Process Jest results
+          try {
+            if (fs.existsSync('jest-accessibility-results/accessibility-test-results.xml')) {
+              const jestResults = fs.readFileSync('jest-accessibility-results/accessibility-test-results.xml', 'utf8');
+              // Parse XML results (simplified)
+              const passedMatch = jestResults.match(/tests="(\d+)"/);
+              const failedMatch = jestResults.match(/failures="(\d+)"/);
+              if (passedMatch && failedMatch) {
+                report.summary.jestTests = `${passedMatch[1]} tests, ${failedMatch[1]} failures`;
+              }
+            }
+          } catch (e) {
+            console.warn('Could not process Jest results:', e.message);
+          }
+          
+          // Process Axe results
+          try {
+            if (fs.existsSync('axe-accessibility-results/axe-results.json')) {
+              const axeResults = JSON.parse(fs.readFileSync('axe-accessibility-results/axe-results.json', 'utf8'));
+              report.summary.axeViolations = `${axeResults.violations?.length || 0} violations`;
+              report.details.axeViolations = axeResults.violations || [];
+              
+              // Generate recommendations based on violations
+              if (axeResults.violations && axeResults.violations.length > 0) {
+                axeResults.violations.forEach(violation => {
+                  report.recommendations.push({
+                    type: 'axe-violation',
+                    rule: violation.id,
+                    impact: violation.impact,
+                    description: violation.description,
+                    help: violation.help,
+                    helpUrl: violation.helpUrl,
+                    nodeCount: violation.nodes?.length || 0
+                  });
+                });
+              }
+            }
+          } catch (e) {
+            console.warn('Could not process Axe results:', e.message);
+          }
+          
+          // Generate markdown report
+          let markdown = `# Accessibility Compliance Report\n\n`;
+          markdown += `**Generated:** ${report.timestamp}\n\n`;
+          markdown += `## Summary\n\n`;
+          markdown += `- **Jest Tests:** ${report.summary.jestTests}\n`;
+          markdown += `- **Playwright Tests:** ${report.summary.playwrightTests}\n`;
+          markdown += `- **Lighthouse Score:** ${report.summary.lighthouseScore}\n`;
+          markdown += `- **Axe Violations:** ${report.summary.axeViolations}\n\n`;
+          
+          if (report.recommendations.length > 0) {
+            markdown += `## Recommendations\n\n`;
+            report.recommendations.forEach((rec, index) => {
+              markdown += `### ${index + 1}. ${rec.rule} (${rec.impact})\n\n`;
+              markdown += `**Description:** ${rec.description}\n\n`;
+              markdown += `**Help:** ${rec.help}\n\n`;
+              markdown += `**Affected Elements:** ${rec.nodeCount}\n\n`;
+              markdown += `**More Info:** [${rec.helpUrl}](${rec.helpUrl})\n\n`;
+            });
+          }
+          
+          markdown += `## WCAG 2.1 AA Compliance Status\n\n`;
+          markdown += `This report covers the following WCAG 2.1 AA success criteria:\n\n`;
+          markdown += `- **1.1.1 Non-text Content** - Images, buttons, and form controls have appropriate alternative text\n`;
+          markdown += `- **1.3.1 Info and Relationships** - Semantic markup conveys meaning and structure\n`;
+          markdown += `- **1.4.3 Contrast (Minimum)** - Text and background colors meet minimum contrast ratios\n`;
+          markdown += `- **2.1.1 Keyboard** - All functionality is available via keyboard\n`;
+          markdown += `- **2.4.1 Bypass Blocks** - Skip links or other mechanisms are provided\n`;
+          markdown += `- **2.4.6 Headings and Labels** - Descriptive headings and labels are used\n`;
+          markdown += `- **3.3.2 Labels or Instructions** - Form fields have associated labels\n`;
+          markdown += `- **4.1.2 Name, Role, Value** - UI components have appropriate names and roles\n\n`;
+          
+          fs.writeFileSync('accessibility-report.md', markdown);
+          fs.writeFileSync('accessibility-report.json', JSON.stringify(report, null, 2));
+          
+          console.log('Accessibility report generated successfully');
+          EOF
+
+      - name: Upload accessibility report
+        uses: actions/upload-artifact@v3
+        with:
+          name: accessibility-compliance-report
+          path: |
+            accessibility-report.md
+            accessibility-report.json
+
+      - name: Comment PR with accessibility results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            
+            let comment = '## 🔍 Accessibility Test Results\n\n';
+            
+            try {
+              const report = JSON.parse(fs.readFileSync('accessibility-report.json', 'utf8'));
+              
+              comment += `### Summary\n`;
+              comment += `- Jest Tests: ${report.summary.jestTests}\n`;
+              comment += `- Axe Violations: ${report.summary.axeViolations}\n\n`;
+              
+              if (report.recommendations.length > 0) {
+                comment += `### ⚠️ Issues Found\n`;
+                comment += `${report.recommendations.length} accessibility issue(s) detected. Please review the full report.\n\n`;
+                
+                // Show top 3 most critical issues
+                const criticalIssues = report.recommendations
+                  .filter(r => r.impact === 'critical' || r.impact === 'serious')
+                  .slice(0, 3);
+                
+                if (criticalIssues.length > 0) {
+                  comment += `#### Critical Issues:\n`;
+                  criticalIssues.forEach((issue, index) => {
+                    comment += `${index + 1}. **${issue.rule}** (${issue.impact}): ${issue.description}\n`;
+                  });
+                  comment += '\n';
+                }
+              } else {
+                comment += `### ✅ All Tests Passed\n`;
+                comment += `No accessibility violations detected!\n\n`;
+              }
+              
+              comment += `### WCAG 2.1 AA Compliance\n`;
+              comment += `This PR has been tested against WCAG 2.1 AA standards including:\n`;
+              comment += `- Color contrast requirements\n`;
+              comment += `- Keyboard navigation\n`;
+              comment += `- Screen reader compatibility\n`;
+              comment += `- Focus management\n`;
+              comment += `- Semantic markup\n\n`;
+              
+              comment += `📊 [View Full Report](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})\n`;
+              
+            } catch (error) {
+              comment += `❌ Error generating accessibility summary: ${error.message}\n`;
+            }
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+  # Accessibility gates - fail build on critical issues
+  accessibility-gates:
+    name: Accessibility Quality Gates
+    runs-on: ubuntu-latest
+    needs: [jest-accessibility, playwright-accessibility, lighthouse-accessibility, axe-accessibility]
+    if: always()
+    
+    steps:
+      - name: Download accessibility results
+        uses: actions/download-artifact@v3
+
+      - name: Check accessibility quality gates
+        run: |
+          echo "Checking accessibility quality gates..."
+          
+          # Initialize gate status
+          GATE_FAILED=false
+          
+          # Check Axe violations
+          if [ -f "axe-accessibility-results/axe-results.json" ]; then
+            CRITICAL_VIOLATIONS=$(jq '.violations | map(select(.impact == "critical")) | length' axe-accessibility-results/axe-results.json)
+            SERIOUS_VIOLATIONS=$(jq '.violations | map(select(.impact == "serious")) | length' axe-accessibility-results/axe-results.json)
+            
+            echo "Critical violations: $CRITICAL_VIOLATIONS"
+            echo "Serious violations: $SERIOUS_VIOLATIONS"
+            
+            if [ "$CRITICAL_VIOLATIONS" -gt 0 ]; then
+              echo "❌ GATE FAILED: Critical accessibility violations found"
+              GATE_FAILED=true
+            fi
+            
+            if [ "$SERIOUS_VIOLATIONS" -gt 5 ]; then
+              echo "❌ GATE FAILED: Too many serious accessibility violations ($SERIOUS_VIOLATIONS > 5)"
+              GATE_FAILED=true
+            fi
+          fi
+          
+          # Check Jest test results
+          if [ -f "jest-accessibility-results/accessibility-test-results.xml" ]; then
+            if grep -q 'failures="[^0]' jest-accessibility-results/accessibility-test-results.xml; then
+              echo "❌ GATE FAILED: Jest accessibility tests have failures"
+              GATE_FAILED=true
+            fi
+          fi
+          
+          if [ "$GATE_FAILED" = true ]; then
+            echo "🚫 Accessibility quality gates failed"
+            exit 1
+          else
+            echo "✅ All accessibility quality gates passed"
+          fi

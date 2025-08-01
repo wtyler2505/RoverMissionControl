@@ -1,0 +1,141 @@
+groups:
+  - name: security_alerts
+    interval: 30s
+    rules:
+      # Critical vulnerability detection
+      - alert: CriticalVulnerabilityDetected
+        expr: vulnerabilities_detected{severity="CRITICAL"} > 0
+        for: 1m
+        labels:
+          severity: critical
+          category: security
+          alert_type: vulnerability
+        annotations:
+          summary: "Critical vulnerability detected in {{ $labels.image }}"
+          description: "Image {{ $labels.image }} has {{ $value }} critical vulnerabilities"
+          runbook_url: "https://wiki.example.com/runbooks/critical-vulnerability"
+          
+      # High vulnerability threshold
+      - alert: HighVulnerabilityThresholdExceeded
+        expr: vulnerabilities_detected{severity="HIGH"} > 5
+        for: 5m
+        labels:
+          severity: high
+          category: security
+          alert_type: vulnerability
+        annotations:
+          summary: "High vulnerability count exceeded threshold in {{ $labels.image }}"
+          description: "Image {{ $labels.image }} has {{ $value }} high vulnerabilities (threshold: 5)"
+          
+      # Policy violations
+      - alert: SecurityPolicyViolation
+        expr: increase(policy_violations_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: high
+          category: security
+          alert_type: policy_violation
+        annotations:
+          summary: "Security policy violation in {{ $labels.image }}"
+          description: "Image {{ $labels.image }} violated {{ $labels.policy }} policy"
+          
+      # Scanner failures
+      - alert: SecurityScannerFailure
+        expr: increase(security_scans_total{status="failure"}[5m]) > 3
+        for: 5m
+        labels:
+          severity: warning
+          category: operations
+        annotations:
+          summary: "Security scanner {{ $labels.scanner }} is failing"
+          description: "Scanner {{ $labels.scanner }} has failed {{ $value }} times in the last 5 minutes"
+          
+      # Scanner down
+      - alert: SecurityScannerDown
+        expr: up{job="security-scanner"} == 0
+        for: 5m
+        labels:
+          severity: critical
+          category: operations
+        annotations:
+          summary: "Security scanner is down"
+          description: "The security scanner service has been down for more than 5 minutes"
+          
+      # Scan duration anomaly
+      - alert: SecurityScanTakingTooLong
+        expr: histogram_quantile(0.95, rate(security_scan_duration_seconds_bucket[5m])) > 300
+        for: 10m
+        labels:
+          severity: warning
+          category: performance
+        annotations:
+          summary: "Security scans are taking too long"
+          description: "95th percentile scan duration for {{ $labels.scanner }} is {{ $value }}s (threshold: 300s)"
+          
+      # No recent scans
+      - alert: NoRecentSecurityScans
+        expr: time() - security_scans_total_created > 7200
+        for: 5m
+        labels:
+          severity: warning
+          category: operations
+        annotations:
+          summary: "No security scans performed recently"
+          description: "No security scans have been performed in the last 2 hours"
+          
+      # Unsigned images detected
+      - alert: UnsignedImageDetected
+        expr: increase(policy_violations_total{policy="image_signing"}[5m]) > 0
+        for: 1m
+        labels:
+          severity: high
+          category: security
+          alert_type: policy_violation
+        annotations:
+          summary: "Unsigned image detected: {{ $labels.image }}"
+          description: "Image {{ $labels.image }} is not signed, violating security policy"
+          
+      # License compliance
+      - alert: ProhibitedLicenseDetected
+        expr: increase(policy_violations_total{policy="license_compliance"}[5m]) > 0
+        for: 5m
+        labels:
+          severity: medium
+          category: compliance
+          alert_type: policy_violation
+        annotations:
+          summary: "Prohibited license detected in {{ $labels.image }}"
+          description: "Image {{ $labels.image }} contains components with prohibited licenses"
+          
+      # Dependency Track integration
+      - alert: DependencyTrackDown
+        expr: up{job="dependency-track"} == 0
+        for: 10m
+        labels:
+          severity: warning
+          category: operations
+        annotations:
+          summary: "Dependency Track is down"
+          description: "Dependency Track has been unreachable for more than 10 minutes"
+          
+      # OPA policy engine
+      - alert: OPAPolicyEngineDown
+        expr: up{job="opa"} == 0
+        for: 5m
+        labels:
+          severity: high
+          category: operations
+        annotations:
+          summary: "OPA Policy Engine is down"
+          description: "OPA Policy Engine has been unreachable for more than 5 minutes"
+          
+      # Trivy database updates
+      - alert: TrivyDatabaseOutdated
+        expr: time() - trivy_db_last_update_timestamp > 86400
+        for: 1h
+        labels:
+          severity: warning
+          category: operations
+        annotations:
+          summary: "Trivy vulnerability database is outdated"
+          description: "Trivy vulnerability database hasn't been updated in {{ $value | humanizeDuration }}"

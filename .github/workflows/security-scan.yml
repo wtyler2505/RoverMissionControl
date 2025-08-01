@@ -1,0 +1,460 @@
+name: Security Scanning Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run daily security scans to catch new CVEs
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      severity_threshold:
+        description: 'CVE severity threshold (CRITICAL, HIGH, MEDIUM, LOW)'
+        required: false
+        default: 'HIGH'
+
+env:
+  DOCKER_BUILDKIT: 1
+  SEVERITY_THRESHOLD: ${{ github.event.inputs.severity_threshold || 'HIGH' }}
+
+jobs:
+  # Pre-build security checks
+  dockerfile-lint:
+    name: Dockerfile Security Linting
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Hadolint
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: backend/Dockerfile
+          failure-threshold: error
+          ignore: DL3008,DL3009  # apt-get version pinning warnings
+
+      - name: Run Hadolint on Frontend
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: frontend/Dockerfile
+          failure-threshold: error
+          ignore: DL3018  # apk version pinning warnings
+
+      - name: Upload Hadolint results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hadolint-results
+          path: hadolint-*.txt
+
+  # Build images for scanning
+  build-images:
+    name: Build Docker Images
+    runs-on: ubuntu-latest
+    needs: dockerfile-lint
+    outputs:
+      backend-image: ${{ steps.meta-backend.outputs.tags }}
+      frontend-image: ${{ steps.meta-frontend.outputs.tags }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (backend)
+        id: meta-backend
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}/backend
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=scan-${{ github.run_id }}
+
+      - name: Build backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: true
+          tags: ${{ steps.meta-backend.outputs.tags }}
+          labels: ${{ steps.meta-backend.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          # Enable SBOM attestation
+          provenance: true
+          sbom: true
+
+      - name: Extract metadata (frontend)
+        id: meta-frontend
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}/frontend
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=scan-${{ github.run_id }}
+
+      - name: Build frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          push: true
+          tags: ${{ steps.meta-frontend.outputs.tags }}
+          labels: ${{ steps.meta-frontend.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: true
+          sbom: true
+
+  # Trivy vulnerability scanning
+  trivy-scan:
+    name: Trivy Container Scan
+    runs-on: ubuntu-latest
+    needs: build-images
+    strategy:
+      matrix:
+        image: [backend, frontend]
+    steps:
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'ghcr.io/${{ github.repository }}/${{ matrix.image }}:scan-${{ github.run_id }}'
+          format: 'sarif'
+          output: 'trivy-${{ matrix.image }}.sarif'
+          severity: ${{ env.SEVERITY_THRESHOLD }},CRITICAL
+          exit-code: '1'
+          ignore-unfixed: false
+          vuln-type: 'os,library'
+          # Additional security checks
+          scanners: 'vuln,secret,config,license'
+
+      - name: Upload Trivy SARIF results
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-${{ matrix.image }}.sarif'
+          category: 'trivy-${{ matrix.image }}'
+
+      - name: Generate Trivy HTML report
+        if: always()
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'ghcr.io/${{ github.repository }}/${{ matrix.image }}:scan-${{ github.run_id }}'
+          format: 'template'
+          template: '@/contrib/html.tpl'
+          output: 'trivy-${{ matrix.image }}.html'
+
+      - name: Upload Trivy reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-reports-${{ matrix.image }}
+          path: |
+            trivy-${{ matrix.image }}.sarif
+            trivy-${{ matrix.image }}.html
+
+  # Snyk vulnerability scanning
+  snyk-scan:
+    name: Snyk Container Scan
+    runs-on: ubuntu-latest
+    needs: build-images
+    if: github.event_name != 'schedule'  # Skip on scheduled runs to save credits
+    strategy:
+      matrix:
+        include:
+          - image: backend
+            dockerfile: ./backend/Dockerfile
+          - image: frontend
+            dockerfile: ./frontend/Dockerfile
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Snyk to check for vulnerabilities
+        uses: snyk/actions/docker@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          image: 'ghcr.io/${{ github.repository }}/${{ matrix.image }}:scan-${{ github.run_id }}'
+          args: --severity-threshold=${{ env.SEVERITY_THRESHOLD }} --file=${{ matrix.dockerfile }}
+          sarif: true
+          sarif-file-output: snyk-${{ matrix.image }}.sarif
+
+      - name: Upload Snyk SARIF results
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: snyk-${{ matrix.image }}.sarif
+          category: 'snyk-${{ matrix.image }}'
+
+      - name: Upload Snyk results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: snyk-results-${{ matrix.image }}
+          path: snyk-${{ matrix.image }}.sarif
+
+  # Generate SBOM with Syft
+  sbom-generation:
+    name: Generate SBOM
+    runs-on: ubuntu-latest
+    needs: build-images
+    strategy:
+      matrix:
+        image: [backend, frontend]
+    steps:
+      - name: Install Syft
+        uses: anchore/sbom-action/download-syft@v0
+
+      - name: Generate SBOM
+        run: |
+          syft ghcr.io/${{ github.repository }}/${{ matrix.image }}:scan-${{ github.run_id }} \
+            -o spdx-json=${{ matrix.image }}-sbom.spdx.json \
+            -o cyclonedx-json=${{ matrix.image }}-sbom.cyclonedx.json \
+            -o table=${{ matrix.image }}-sbom.txt
+
+      - name: Upload SBOM artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ matrix.image }}
+          path: |
+            ${{ matrix.image }}-sbom.spdx.json
+            ${{ matrix.image }}-sbom.cyclonedx.json
+            ${{ matrix.image }}-sbom.txt
+
+      - name: Submit SBOM to Dependency Track
+        if: vars.DEPENDENCY_TRACK_URL != ''
+        run: |
+          curl -X POST "${{ vars.DEPENDENCY_TRACK_URL }}/api/v1/bom" \
+            -H "X-Api-Key: ${{ secrets.DEPENDENCY_TRACK_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d @- <<EOF
+          {
+            "project": "${{ github.repository }}-${{ matrix.image }}",
+            "bom": $(cat ${{ matrix.image }}-sbom.cyclonedx.json | jq -Rs .)
+          }
+          EOF
+
+  # Docker Bench Security
+  docker-bench:
+    name: Docker Bench Security
+    runs-on: ubuntu-latest
+    needs: build-images
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Docker Bench Security
+        run: |
+          docker run --rm --net host --pid host --userns host --cap-add audit_control \
+            -e DOCKER_CONTENT_TRUST=$DOCKER_CONTENT_TRUST \
+            -v /etc:/etc:ro \
+            -v /usr/bin/containerd:/usr/bin/containerd:ro \
+            -v /usr/bin/runc:/usr/bin/runc:ro \
+            -v /usr/lib/systemd:/usr/lib/systemd:ro \
+            -v /var/lib:/var/lib:ro \
+            -v /var/run/docker.sock:/var/run/docker.sock:ro \
+            --label docker_bench_security \
+            docker/docker-bench-security -l docker-bench-security.log
+
+      - name: Upload Docker Bench results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-bench-results
+          path: docker-bench-security.log
+
+  # OPA Policy Evaluation
+  opa-policy-check:
+    name: OPA Policy Compliance
+    runs-on: ubuntu-latest
+    needs: [build-images, sbom-generation]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download SBOMs
+        uses: actions/download-artifact@v4
+        with:
+          pattern: sbom-*
+          merge-multiple: true
+
+      - name: Setup OPA
+        uses: open-policy-agent/setup-opa@v2
+        with:
+          version: latest
+
+      - name: Evaluate security policies
+        run: |
+          # Evaluate each SBOM against security policies
+          for sbom in *-sbom.cyclonedx.json; do
+            image_name=$(echo $sbom | sed 's/-sbom.cyclonedx.json//')
+            echo "Evaluating policies for $image_name"
+            
+            opa eval -d .github/security-policies/ \
+              -i $sbom \
+              "data.docker.security.allow" > $image_name-policy-result.json
+              
+            # Check if policies passed
+            if ! jq -e '.result[0].expressions[0].value == true' $image_name-policy-result.json; then
+              echo "❌ Security policies failed for $image_name"
+              jq '.result[0].expressions[0]' $image_name-policy-result.json
+              exit 1
+            else
+              echo "✅ Security policies passed for $image_name"
+            fi
+          done
+
+      - name: Upload policy results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: opa-policy-results
+          path: '*-policy-result.json'
+
+  # Generate security report
+  security-report:
+    name: Generate Security Dashboard
+    runs-on: ubuntu-latest
+    needs: [trivy-scan, snyk-scan, sbom-generation, docker-bench, opa-policy-check]
+    if: always()
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: security-artifacts
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install jinja2 pyyaml pandas plotly
+
+      - name: Generate security dashboard
+        run: |
+          python .github/scripts/generate-security-dashboard.py \
+            --artifacts-dir security-artifacts \
+            --output-dir security-dashboard
+
+      - name: Upload security dashboard
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-dashboard
+          path: security-dashboard/
+
+      - name: Deploy dashboard to GitHub Pages
+        if: github.ref == 'refs/heads/main'
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./security-dashboard
+          destination_dir: security-reports/${{ github.run_id }}
+
+      - name: Comment PR with security summary
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const summary = fs.readFileSync('security-dashboard/summary.md', 'utf8');
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: summary
+            });
+
+  # Alert on critical vulnerabilities
+  security-alerts:
+    name: Security Alerting
+    runs-on: ubuntu-latest
+    needs: [trivy-scan, snyk-scan]
+    if: failure()
+    steps:
+      - name: Send Slack notification
+        if: vars.SLACK_WEBHOOK_URL != ''
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            {
+              "text": "🚨 Critical security vulnerabilities found in Docker images!",
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "Security Scan Failed"
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Repository:* ${{ github.repository }}\n*Branch:* ${{ github.ref_name }}\n*Run:* ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "Critical vulnerabilities detected that exceed the configured severity threshold. Immediate action required!"
+                  }
+                }
+              ]
+            }
+
+      - name: Create GitHub Issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = `🚨 Critical Security Vulnerabilities Detected - Run #${context.runNumber}`;
+            const body = `## Security Scan Results
+            
+            Critical vulnerabilities have been detected in the Docker images that exceed our security threshold.
+            
+            **Severity Threshold:** ${process.env.SEVERITY_THRESHOLD}
+            **Workflow Run:** [View Results](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})
+            
+            ### Immediate Actions Required:
+            1. Review the security scan results
+            2. Update vulnerable dependencies
+            3. Apply security patches
+            4. Re-run the security pipeline
+            
+            ### Affected Images:
+            - [ ] Backend image
+            - [ ] Frontend image
+            
+            **Priority:** CRITICAL
+            **Labels:** security, vulnerability, docker
+            
+            cc: @security-team`;
+            
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: title,
+              body: body,
+              labels: ['security', 'vulnerability', 'critical', 'docker']
+            });
