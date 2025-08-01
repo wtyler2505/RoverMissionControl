@@ -1,0 +1,3 @@
+"""
+Hardware Protocol Adapters Tests
+"""
