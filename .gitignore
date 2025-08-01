@@ -1,86 +1,181 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# RoverMissionControl - Professional Enterprise Monorepo .gitignore
+# https://github.com/github/gitignore
 
-# IDE and editors
-.idea/
-.vscode/
-
+# ===================
 # Dependencies
+# ===================
 node_modules/
-/node_modules
-/.pnp
-.pnp.js
-.yarn/install-state.gz
+.pnp.*
 .yarn/*
 !.yarn/patches
 !.yarn/plugins
 !.yarn/releases
 !.yarn/versions
 
-# Testing
-/coverage
-
-# Next.js
-/.next/
-/out/
-next-env.d.ts
-*.tsbuildinfo
-
-# Production builds
-/build
+# ===================
+# Build Outputs
+# ===================
 dist/
-dist
+build/
+out/
+coverage/
+.next/
+.turbo/
+.cache/
 
-# Environment files (comprehensive coverage)
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
 
-*token.json*
-*credentials.json*
+# ===================
+# Environment & Secrets
+# ===================
+.env*
+!.env.example
+!.env.template
 
-# Logs and debug files
+# API Keys and Credentials
+*token*
+*credentials*
+*secret*
+*key*
+*.pem
+*.p12
+*.pfx
+
+# ===================
+# IDE & Editors
+# ===================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Visual Studio
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# AI Assistant Directories
+.claude/
+.cursor/
+.emergent/
+.roo/
+.roomodes
+.trae/
+.windsurf/
+.clinerules/
+
+# ===================
+# Logs
+# ===================
+logs/
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
-dump.rdb
+lerna-debug.log*
 
-# System files
-.DS_Store
-*.pem
+# ===================
+# Testing
+# ===================
+test-results/
+playwright-report/
+test-results.xml
+coverage.xml
 
-# Python
+# ===================
+# Python (Backend)
+# ===================
 __pycache__/
-*pyc*
-venv/
+*.py[cod]
+*$py.class
+*.so
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
 .venv/
+venv/
+ENV/
+env/
+.coverage
+.pytest_cache/
 
-# Development tools
-chainlit.md
-.chainlit
-.ipynb_checkpoints/
-.ac
+# ===================
+# OS Files
+# ===================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
 
-# Deployment
+# ===================
+# Temporary Files
+# ===================
+*.tmp
+*.temp
+*.bak
+*.backup
+*~
+
+# ===================
+# Archive Files
+# ===================
+*.zip
+*.tar.gz
+*.tar
+*.tgz
+*.rar
+*.7z
+
+# ===================
+# Package Managers
+# ===================
+package-lock.json
+yarn.lock
+.yarn-integrity
+
+# ===================
+# Deployment & Cloud
+# ===================
 .vercel
+.netlify
+.serverless/
 
-# Data and databases
-agenthub/agents/youtube/db
+# ===================
+# Development Tools
+# ===================
+.chainlit/
+.ipynb_checkpoints/
+dump.rdb 
+*storybook.log
+storybook-static
+.taskmaster/
+.storybook/
+.husky/
+.mcp.json
+kite-mcp-server-time/
 
-# Archive files and large assets
-**/*.zip
-**/*.tar.gz
-**/*.tar
-**/*.tgz
-*.pack
-*.deb
-*.dylib
+# Database Files
+*.db
+*.sqlite
+*.sqlite3
+data/
 
-# Build caches
-.cache/
+# Session/Transcript Files
+*-this-session-is-being-continued-from-a-previous-co.txt
+developement_session_transcripts/
+session_transcripts/
 
-# Mobile development
-android-sdk/ frontend/node_modules/.cache/default-development/1.pack
-frontend/node_modules/.cache/default-development/1.pack
-frontend/node_modules/.cache/default-development/2.pack
-frontend/node_modules/.cache/default-development/3.pack_
-frontend/node_modules/.cache/default-development/3.pack
-frontend/node_modules/.cache/default-development/5.pack
-frontend/node_modules/.cache/default-development/0.pack
+# Test Files
+test_result.md
+task_analysis_report.json
+service-worker-validation-report.json

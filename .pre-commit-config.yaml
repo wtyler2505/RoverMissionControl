@@ -1,0 +1,132 @@
+# Pre-commit hooks configuration for security scanning
+# Install: pip install pre-commit
+# Setup: pre-commit install
+
+repos:
+  # General security and code quality
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+        args: ['--unsafe']
+      - id: check-added-large-files
+        args: ['--maxkb=1000']
+      - id: check-merge-conflict
+      - id: detect-private-key
+      - id: check-executables-have-shebangs
+      - id: check-json
+      - id: pretty-format-json
+        args: ['--autofix', '--no-sort-keys']
+
+  # Dockerfile linting with Hadolint
+  - repo: https://github.com/hadolint/hadolint
+    rev: v2.12.0
+    hooks:
+      - id: hadolint-docker
+        name: Lint Dockerfiles
+        entry: hadolint/hadolint:v2.12.0 hadolint
+        language: docker_image
+        types: [dockerfile]
+        args: [
+          '--ignore', 'DL3008',  # apt-get version pinning
+          '--ignore', 'DL3009',  # apt-get clean
+          '--ignore', 'DL3018',  # apk version pinning
+          '--failure-threshold', 'error'
+        ]
+
+  # Security scanning for secrets
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.4.0
+    hooks:
+      - id: detect-secrets
+        args: ['--baseline', '.secrets.baseline']
+        exclude: .*\.(lock|min\.js|snap)$
+
+  # Python security scanning
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.7.5
+    hooks:
+      - id: bandit
+        args: ['-r', 'backend/', '-ll', '-x', 'backend/tests/']
+        files: \.py$
+
+  # YAML linting
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.33.0
+    hooks:
+      - id: yamllint
+        args: ['-d', 'relaxed']
+        files: \.(yaml|yml)$
+
+  # Shell script analysis
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.9.0.6
+    hooks:
+      - id: shellcheck
+        args: ['--severity=warning']
+
+  # Docker Compose linting - disabled due to broken repo
+  # - repo: https://github.com/kursion/docker-compose-check
+  #   rev: v1.0.0
+  #   hooks:
+  #     - id: docker-compose-check
+  #       files: docker-compose.*\.ya?ml$
+
+  # License detection
+  - repo: https://github.com/Lucas-C/pre-commit-hooks
+    rev: v1.5.4
+    hooks:
+      - id: insert-license
+        name: Add license headers
+        files: \.(py|js|ts|jsx|tsx)$
+        args:
+          - --license-filepath
+          - .github/license-header.txt
+          - --comment-style
+          - //
+        exclude: (node_modules|build|dist)/
+
+  # Security policy checks
+  - repo: local
+    hooks:
+      - id: check-dockerfile-security
+        name: Check Dockerfile security best practices
+        entry: scripts/check-dockerfile-security.sh
+        language: script
+        files: Dockerfile$
+        
+      - id: validate-security-policies
+        name: Validate OPA security policies
+        entry: scripts/validate-opa-policies.sh
+        language: script
+        files: \.rego$
+        
+      - id: scan-dependencies
+        name: Quick dependency security scan
+        entry: scripts/quick-dependency-scan.sh
+        language: script
+        pass_filenames: false
+        always_run: true
+
+# Configuration for specific hooks
+default_language_version:
+  python: python3.11
+
+exclude: |
+  (?x)^(
+    .*\.(lock|snap|min\.js|chunk\.js)|
+    node_modules/|
+    build/|
+    dist/|
+    coverage/|
+    \.git/|
+    \.pytest_cache/|
+    __pycache__/|
+    \.venv/|
+    env/|
+    venv/
+  )
+
+fail_fast: false
