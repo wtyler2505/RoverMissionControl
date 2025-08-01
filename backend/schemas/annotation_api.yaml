@@ -1,0 +1,1586 @@
+openapi: 3.0.0
+info:
+  title: Enterprise Annotation System API
+  description: API for managing annotations on telemetry charts with versioning, permissions, and collaboration features
+  version: 1.0.0
+  contact:
+    name: Rover Mission Control Team
+    email: support@rovermission.control
+
+servers:
+  - url: https://api.rovermission.control/v1
+    description: Production server
+  - url: https://staging-api.rovermission.control/v1
+    description: Staging server
+  - url: http://localhost:8000/v1
+    description: Development server
+
+security:
+  - BearerAuth: []
+
+tags:
+  - name: Annotations
+    description: Core annotation operations
+  - name: Versions
+    description: Version control and history
+  - name: Permissions
+    description: Access control management
+  - name: Comments
+    description: Comments and discussions
+  - name: Search
+    description: Search and discovery
+  - name: Export
+    description: Export and integration
+  - name: Collaboration
+    description: Real-time collaboration
+
+paths:
+  # ===== Annotations =====
+  /annotations:
+    get:
+      tags: [Annotations]
+      summary: List annotations
+      operationId: listAnnotations
+      parameters:
+        - $ref: '#/components/parameters/ChartId'
+        - $ref: '#/components/parameters/CollectionId'
+        - $ref: '#/components/parameters/Tags'
+        - $ref: '#/components/parameters/TimeRange'
+        - $ref: '#/components/parameters/Search'
+        - $ref: '#/components/parameters/Severity'
+        - $ref: '#/components/parameters/CreatedBy'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Sort'
+      responses:
+        200:
+          description: List of annotations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnnotationList'
+        401:
+          $ref: '#/components/responses/Unauthorized'
+        403:
+          $ref: '#/components/responses/Forbidden'
+
+    post:
+      tags: [Annotations]
+      summary: Create annotation
+      operationId: createAnnotation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnnotationCreate'
+      responses:
+        201:
+          description: Created annotation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Annotation'
+        400:
+          $ref: '#/components/responses/BadRequest'
+        401:
+          $ref: '#/components/responses/Unauthorized'
+        403:
+          $ref: '#/components/responses/Forbidden'
+
+  /annotations/bulk:
+    post:
+      tags: [Annotations]
+      summary: Bulk create annotations
+      operationId: bulkCreateAnnotations
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                annotations:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/AnnotationCreate'
+                  maxItems: 100
+      responses:
+        201:
+          description: Created annotations
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  created:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Annotation'
+                  errors:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        index:
+                          type: integer
+                        error:
+                          type: string
+
+    patch:
+      tags: [Annotations]
+      summary: Bulk update annotations
+      operationId: bulkUpdateAnnotations
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                updates:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                      data:
+                        $ref: '#/components/schemas/AnnotationUpdate'
+      responses:
+        200:
+          description: Updated annotations
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  updated:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Annotation'
+
+  /annotations/{id}:
+    get:
+      tags: [Annotations]
+      summary: Get annotation details
+      operationId: getAnnotation
+      parameters:
+        - $ref: '#/components/parameters/AnnotationId'
+        - name: include_versions
+          in: query
+          schema:
+            type: boolean
+          description: Include version history
+        - name: include_comments
+          in: query
+          schema:
+            type: boolean
+          description: Include comments
+        - name: include_permissions
+          in: query
+          schema:
+            type: boolean
+          description: Include permissions
+      responses:
+        200:
+          description: Annotation details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnnotationDetail'
+        404:
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [Annotations]
+      summary: Update annotation
+      operationId: updateAnnotation
+      parameters:
+        - $ref: '#/components/parameters/AnnotationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnnotationUpdate'
+      responses:
+        200:
+          description: Updated annotation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Annotation'
+        400:
+          $ref: '#/components/responses/BadRequest'
+        404:
+          $ref: '#/components/responses/NotFound'
+        409:
+          $ref: '#/components/responses/Conflict'
+
+    delete:
+      tags: [Annotations]
+      summary: Delete annotation
+      operationId: deleteAnnotation
+      parameters:
+        - $ref: '#/components/parameters/AnnotationId'
+        - name: hard_delete
+          in: query
+          schema:
+            type: boolean
+            default: false
+          description: Permanently delete instead of soft delete
+      responses:
+        204:
+          description: Annotation deleted
+        404:
+          $ref: '#/components/responses/NotFound'
+
+  # ===== Versions =====
+  /annotations/{id}/versions:
+    get:
+      tags: [Versions]
+      summary: Get annotation version history
+      operationId: getVersionHistory
+      parameters:
+        - $ref: '#/components/parameters/AnnotationId'
+        - name: branch
+          in: query
+          schema:
+            type: string
+            default: main
+          description: Branch name
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        200:
+          description: Version history
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersionList'
+
+    post:
+      tags: [Versions]
+      summary: Create new version branch
+      operationId: createVersionBranch
+      parameters:
+        - $ref: '#/components/parameters/AnnotationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [branch_name]
+              properties:
+                branch_name:
+                  type: string
+                description:
+                  type: string
+                from_version_id:
+                  type: string
+                  format: uuid
+      responses:
+        201:
+          description: Branch created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Branch'
+
+  /annotations/{id}/versions/{version_id}:
+    get:
+      tags: [Versions]
+      summary: Get specific version
+      operationId: getVersion
+      parameters:
+        - $ref: '#/components/parameters/AnnotationId'
+        - $ref: '#/components/parameters/VersionId'
+      responses:
+        200:
+          description: Version details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Version'
+
+  /annotations/{id}/versions/{version_id}/restore:
+    post:
+      tags: [Versions]
+      summary: Restore annotation to specific version
+      operationId: restoreVersion
+      parameters:
+        - $ref: '#/components/parameters/AnnotationId'
+        - $ref: '#/components/parameters/VersionId'
+      responses:
+        200:
+          description: Restored annotation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Annotation'
+
+  /annotations/{id}/versions/{version_id}/diff:
+    get:
+      tags: [Versions]
+      summary: Get diff between versions
+      operationId: getVersionDiff
+      parameters:
+        - $ref: '#/components/parameters/AnnotationId'
+        - $ref: '#/components/parameters/VersionId'
+        - name: compare_to
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Version ID to compare with
+      responses:
+        200:
+          description: Version diff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersionDiff'
+
+  # ===== Permissions =====
+  /annotations/{id}/permissions:
+    get:
+      tags: [Permissions]
+      summary: Get annotation permissions
+      operationId: getPermissions
+      parameters:
+        - $ref: '#/components/parameters/AnnotationId'
+      responses:
+        200:
+          description: Permission list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PermissionList'
+
+    post:
+      tags: [Permissions]
+      summary: Grant permission
+      operationId: grantPermission
+      parameters:
+        - $ref: '#/components/parameters/AnnotationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PermissionGrant'
+      responses:
+        201:
+          description: Permission granted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Permission'
+
+    put:
+      tags: [Permissions]
+      summary: Update permissions
+      operationId: updatePermissions
+      parameters:
+        - $ref: '#/components/parameters/AnnotationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/PermissionUpdate'
+      responses:
+        200:
+          description: Updated permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PermissionList'
+
+  /annotations/{id}/permissions/{permission_id}:
+    delete:
+      tags: [Permissions]
+      summary: Revoke permission
+      operationId: revokePermission
+      parameters:
+        - $ref: '#/components/parameters/AnnotationId'
+        - $ref: '#/components/parameters/PermissionId'
+      responses:
+        204:
+          description: Permission revoked
+
+  # ===== Comments =====
+  /annotations/{id}/comments:
+    get:
+      tags: [Comments]
+      summary: Get annotation comments
+      operationId: getComments
+      parameters:
+        - $ref: '#/components/parameters/AnnotationId'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        200:
+          description: Comment thread
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommentList'
+
+    post:
+      tags: [Comments]
+      summary: Add comment
+      operationId: addComment
+      parameters:
+        - $ref: '#/components/parameters/AnnotationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommentCreate'
+      responses:
+        201:
+          description: Created comment
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comment'
+
+  /annotations/{id}/comments/{comment_id}:
+    put:
+      tags: [Comments]
+      summary: Update comment
+      operationId: updateComment
+      parameters:
+        - $ref: '#/components/parameters/AnnotationId'
+        - $ref: '#/components/parameters/CommentId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                content:
+                  type: string
+      responses:
+        200:
+          description: Updated comment
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comment'
+
+    delete:
+      tags: [Comments]
+      summary: Delete comment
+      operationId: deleteComment
+      parameters:
+        - $ref: '#/components/parameters/AnnotationId'
+        - $ref: '#/components/parameters/CommentId'
+      responses:
+        204:
+          description: Comment deleted
+
+  # ===== Search =====
+  /annotations/search:
+    post:
+      tags: [Search]
+      summary: Advanced search
+      operationId: searchAnnotations
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SearchQuery'
+      responses:
+        200:
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResults'
+
+  /annotations/suggest:
+    get:
+      tags: [Search]
+      summary: Get annotation suggestions
+      operationId: suggestAnnotations
+      parameters:
+        - name: chart_id
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: context
+          in: query
+          schema:
+            type: object
+            properties:
+              time_range:
+                $ref: '#/components/schemas/TimeRange'
+              metrics:
+                type: array
+                items:
+                  type: string
+      responses:
+        200:
+          description: Suggested annotations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Annotation'
+
+  # ===== Export =====
+  /annotations/export:
+    post:
+      tags: [Export]
+      summary: Export annotations
+      operationId: exportAnnotations
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExportRequest'
+      responses:
+        200:
+          description: Export file
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+                example: attachment; filename="annotations_export.pdf"
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Annotation'
+            text/csv:
+              schema:
+                type: string
+
+  /annotations/export/jobs:
+    post:
+      tags: [Export]
+      summary: Create export job
+      operationId: createExportJob
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExportJobRequest'
+      responses:
+        201:
+          description: Export job created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportJob'
+
+  # ===== WebSocket Events =====
+  /ws:
+    get:
+      tags: [Collaboration]
+      summary: WebSocket endpoint for real-time updates
+      operationId: websocketConnect
+      responses:
+        101:
+          description: Switching Protocols
+
+# ===== Components =====
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    AnnotationId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Annotation ID
+
+    VersionId:
+      name: version_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Version ID
+
+    PermissionId:
+      name: permission_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Permission ID
+
+    CommentId:
+      name: comment_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Comment ID
+
+    ChartId:
+      name: chart_id
+      in: query
+      schema:
+        type: string
+      description: Filter by chart ID
+
+    CollectionId:
+      name: collection_id
+      in: query
+      schema:
+        type: string
+        format: uuid
+      description: Filter by collection ID
+
+    Tags:
+      name: tags
+      in: query
+      schema:
+        type: array
+        items:
+          type: string
+      description: Filter by tags
+
+    TimeRange:
+      name: time_range
+      in: query
+      schema:
+        type: object
+        properties:
+          start:
+            type: string
+            format: date-time
+          end:
+            type: string
+            format: date-time
+      description: Filter by time range
+
+    Search:
+      name: search
+      in: query
+      schema:
+        type: string
+      description: Search text
+
+    Severity:
+      name: severity
+      in: query
+      schema:
+        type: array
+        items:
+          type: string
+          enum: [info, warning, error, critical]
+      description: Filter by severity
+
+    CreatedBy:
+      name: created_by
+      in: query
+      schema:
+        type: string
+        format: uuid
+      description: Filter by creator
+
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+      description: Page number
+
+    Limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+      description: Items per page
+
+    Sort:
+      name: sort
+      in: query
+      schema:
+        type: string
+        enum: [created_at, -created_at, updated_at, -updated_at, title, -title]
+        default: -created_at
+      description: Sort order
+
+  schemas:
+    # ===== Core Models =====
+    Annotation:
+      type: object
+      required: [id, type, coordinates, chart_id, chart_type]
+      properties:
+        id:
+          type: string
+          format: uuid
+        collection_id:
+          type: string
+          format: uuid
+        chart_id:
+          type: string
+        chart_type:
+          type: string
+        dashboard_id:
+          type: string
+        type:
+          type: string
+          enum: [point, line, arrow, rect, text, polygon, ellipse, path, custom]
+        coordinates:
+          $ref: '#/components/schemas/Coordinates'
+        chart_context:
+          $ref: '#/components/schemas/ChartContext'
+        title:
+          type: string
+          maxLength: 500
+        content:
+          type: string
+        severity:
+          type: string
+          enum: [info, warning, error, critical]
+        metadata:
+          type: object
+        style:
+          $ref: '#/components/schemas/AnnotationStyle'
+        tags:
+          type: array
+          items:
+            type: string
+        created_by:
+          $ref: '#/components/schemas/User'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        is_active:
+          type: boolean
+        is_approved:
+          type: boolean
+        is_pinned:
+          type: boolean
+
+    AnnotationDetail:
+      allOf:
+        - $ref: '#/components/schemas/Annotation'
+        - type: object
+          properties:
+            versions:
+              type: array
+              items:
+                $ref: '#/components/schemas/Version'
+            comments:
+              type: array
+              items:
+                $ref: '#/components/schemas/Comment'
+            permissions:
+              type: array
+              items:
+                $ref: '#/components/schemas/Permission'
+            attachments:
+              type: array
+              items:
+                $ref: '#/components/schemas/Attachment'
+
+    AnnotationCreate:
+      type: object
+      required: [type, coordinates, chart_id, chart_type]
+      properties:
+        collection_id:
+          type: string
+          format: uuid
+        chart_id:
+          type: string
+        chart_type:
+          type: string
+        dashboard_id:
+          type: string
+        type:
+          type: string
+          enum: [point, line, arrow, rect, text, polygon, ellipse, path, custom]
+        coordinates:
+          $ref: '#/components/schemas/Coordinates'
+        chart_context:
+          $ref: '#/components/schemas/ChartContext'
+        title:
+          type: string
+          maxLength: 500
+        content:
+          type: string
+        severity:
+          type: string
+          enum: [info, warning, error, critical]
+        metadata:
+          type: object
+        style:
+          $ref: '#/components/schemas/AnnotationStyle'
+        tags:
+          type: array
+          items:
+            type: string
+        is_private:
+          type: boolean
+          default: false
+
+    AnnotationUpdate:
+      type: object
+      properties:
+        coordinates:
+          $ref: '#/components/schemas/Coordinates'
+        title:
+          type: string
+          maxLength: 500
+        content:
+          type: string
+        severity:
+          type: string
+          enum: [info, warning, error, critical]
+        metadata:
+          type: object
+        style:
+          $ref: '#/components/schemas/AnnotationStyle'
+        tags:
+          type: array
+          items:
+            type: string
+        is_active:
+          type: boolean
+        is_pinned:
+          type: boolean
+
+    AnnotationList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Annotation'
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+        has_more:
+          type: boolean
+
+    # ===== Geometry Models =====
+    Coordinates:
+      oneOf:
+        - $ref: '#/components/schemas/PointCoordinates'
+        - $ref: '#/components/schemas/LineCoordinates'
+        - $ref: '#/components/schemas/RectCoordinates'
+        - $ref: '#/components/schemas/PolygonCoordinates'
+        - $ref: '#/components/schemas/PathCoordinates'
+
+    PointCoordinates:
+      type: object
+      required: [x, y]
+      properties:
+        x:
+          type: number
+        y:
+          type: number
+
+    LineCoordinates:
+      type: object
+      required: [x1, y1, x2, y2]
+      properties:
+        x1:
+          type: number
+        y1:
+          type: number
+        x2:
+          type: number
+        y2:
+          type: number
+
+    RectCoordinates:
+      type: object
+      required: [x, y, width, height]
+      properties:
+        x:
+          type: number
+        y:
+          type: number
+        width:
+          type: number
+        height:
+          type: number
+
+    PolygonCoordinates:
+      type: object
+      required: [points]
+      properties:
+        points:
+          type: array
+          items:
+            type: object
+            properties:
+              x:
+                type: number
+              y:
+                type: number
+
+    PathCoordinates:
+      type: object
+      required: [d]
+      properties:
+        d:
+          type: string
+          description: SVG path data
+
+    ChartContext:
+      type: object
+      properties:
+        time_range:
+          $ref: '#/components/schemas/TimeRange'
+        value_range:
+          type: object
+          properties:
+            min:
+              type: number
+            max:
+              type: number
+        scale:
+          type: object
+          properties:
+            x:
+              type: string
+              enum: [time, linear, log]
+            y:
+              type: string
+              enum: [linear, log, symlog]
+        zoom:
+          type: object
+          properties:
+            k:
+              type: number
+            x:
+              type: number
+            y:
+              type: number
+        dimensions:
+          type: object
+          properties:
+            width:
+              type: number
+            height:
+              type: number
+
+    AnnotationStyle:
+      type: object
+      properties:
+        fill:
+          type: string
+          pattern: ^#[0-9A-Fa-f]{6}$
+        stroke:
+          type: string
+          pattern: ^#[0-9A-Fa-f]{6}$
+        strokeWidth:
+          type: number
+        opacity:
+          type: number
+          minimum: 0
+          maximum: 1
+        fontSize:
+          type: string
+        fontWeight:
+          type: string
+        textAnchor:
+          type: string
+          enum: [start, middle, end]
+
+    # ===== Version Models =====
+    Version:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        annotation_id:
+          type: string
+          format: uuid
+        version_number:
+          type: integer
+        data:
+          $ref: '#/components/schemas/Annotation'
+        change_type:
+          type: string
+          enum: [create, update, delete, restore, approve, reject, merge]
+        change_summary:
+          type: string
+        diff:
+          $ref: '#/components/schemas/VersionDiff'
+        created_by:
+          $ref: '#/components/schemas/User'
+        created_at:
+          type: string
+          format: date-time
+        branch_name:
+          type: string
+        parent_version_id:
+          type: string
+          format: uuid
+
+    VersionList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Version'
+        total:
+          type: integer
+
+    VersionDiff:
+      type: object
+      properties:
+        added:
+          type: object
+        removed:
+          type: object
+        modified:
+          type: object
+
+    Branch:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        created_from_version_id:
+          type: string
+          format: uuid
+        created_by:
+          $ref: '#/components/schemas/User'
+        created_at:
+          type: string
+          format: date-time
+
+    # ===== Permission Models =====
+    Permission:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        resource_type:
+          type: string
+          enum: [collection, annotation]
+        resource_id:
+          type: string
+          format: uuid
+        target_type:
+          type: string
+          enum: [user, group, role, organization, public]
+        target_id:
+          type: string
+          format: uuid
+        can_read:
+          type: boolean
+        can_create:
+          type: boolean
+        can_update:
+          type: boolean
+        can_delete:
+          type: boolean
+        can_approve:
+          type: boolean
+        can_share:
+          type: boolean
+        can_export:
+          type: boolean
+        granted_by:
+          $ref: '#/components/schemas/User'
+        granted_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+
+    PermissionList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Permission'
+        effective_permissions:
+          type: object
+          properties:
+            can_read:
+              type: boolean
+            can_create:
+              type: boolean
+            can_update:
+              type: boolean
+            can_delete:
+              type: boolean
+            can_approve:
+              type: boolean
+            can_share:
+              type: boolean
+            can_export:
+              type: boolean
+
+    PermissionGrant:
+      type: object
+      required: [target_type, target_id]
+      properties:
+        target_type:
+          type: string
+          enum: [user, group, role, organization]
+        target_id:
+          type: string
+          format: uuid
+        permissions:
+          type: object
+          properties:
+            can_read:
+              type: boolean
+            can_create:
+              type: boolean
+            can_update:
+              type: boolean
+            can_delete:
+              type: boolean
+            can_approve:
+              type: boolean
+            can_share:
+              type: boolean
+            can_export:
+              type: boolean
+        expires_at:
+          type: string
+          format: date-time
+        notes:
+          type: string
+
+    PermissionUpdate:
+      type: object
+      required: [permission_id]
+      properties:
+        permission_id:
+          type: string
+          format: uuid
+        permissions:
+          type: object
+          properties:
+            can_read:
+              type: boolean
+            can_create:
+              type: boolean
+            can_update:
+              type: boolean
+            can_delete:
+              type: boolean
+            can_approve:
+              type: boolean
+            can_share:
+              type: boolean
+            can_export:
+              type: boolean
+        expires_at:
+          type: string
+          format: date-time
+
+    # ===== Comment Models =====
+    Comment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        annotation_id:
+          type: string
+          format: uuid
+        parent_comment_id:
+          type: string
+          format: uuid
+        content:
+          type: string
+          maxLength: 5000
+        content_format:
+          type: string
+          enum: [plain, markdown]
+        mentioned_users:
+          type: array
+          items:
+            type: string
+            format: uuid
+        is_resolved:
+          type: boolean
+        resolved_by:
+          $ref: '#/components/schemas/User'
+        resolved_at:
+          type: string
+          format: date-time
+        reactions:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+              format: uuid
+        created_by:
+          $ref: '#/components/schemas/User'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CommentList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Comment'
+        total:
+          type: integer
+
+    CommentCreate:
+      type: object
+      required: [content]
+      properties:
+        parent_comment_id:
+          type: string
+          format: uuid
+        content:
+          type: string
+          maxLength: 5000
+        content_format:
+          type: string
+          enum: [plain, markdown]
+          default: plain
+        mentioned_users:
+          type: array
+          items:
+            type: string
+            format: uuid
+
+    # ===== Search Models =====
+    SearchQuery:
+      type: object
+      properties:
+        text:
+          type: string
+          description: Full-text search query
+        filters:
+          type: object
+          properties:
+            chart_ids:
+              type: array
+              items:
+                type: string
+            collection_ids:
+              type: array
+              items:
+                type: string
+                format: uuid
+            tags:
+              type: array
+              items:
+                type: string
+            severity:
+              type: array
+              items:
+                type: string
+                enum: [info, warning, error, critical]
+            created_by:
+              type: array
+              items:
+                type: string
+                format: uuid
+            date_range:
+              $ref: '#/components/schemas/TimeRange'
+            is_approved:
+              type: boolean
+            is_pinned:
+              type: boolean
+        sort:
+          type: object
+          properties:
+            field:
+              type: string
+              enum: [relevance, created_at, updated_at, title]
+            order:
+              type: string
+              enum: [asc, desc]
+        pagination:
+          type: object
+          properties:
+            page:
+              type: integer
+              minimum: 1
+            limit:
+              type: integer
+              minimum: 1
+              maximum: 100
+        aggregations:
+          type: array
+          items:
+            type: string
+            enum: [chart, tag, severity, creator, date_histogram]
+
+    SearchResults:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Annotation'
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+        aggregations:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: object
+              properties:
+                key:
+                  type: string
+                count:
+                  type: integer
+
+    # ===== Export Models =====
+    ExportRequest:
+      type: object
+      required: [format]
+      properties:
+        format:
+          type: string
+          enum: [pdf, excel, csv, json, xml]
+        filters:
+          $ref: '#/components/schemas/ExportFilters'
+        options:
+          $ref: '#/components/schemas/ExportOptions'
+
+    ExportFilters:
+      type: object
+      properties:
+        annotation_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        chart_ids:
+          type: array
+          items:
+            type: string
+        collection_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        date_range:
+          $ref: '#/components/schemas/TimeRange'
+        tags:
+          type: array
+          items:
+            type: string
+
+    ExportOptions:
+      type: object
+      properties:
+        include_comments:
+          type: boolean
+          default: false
+        include_versions:
+          type: boolean
+          default: false
+        include_attachments:
+          type: boolean
+          default: false
+        template:
+          type: string
+        columns:
+          type: array
+          items:
+            type: string
+
+    ExportJobRequest:
+      allOf:
+        - $ref: '#/components/schemas/ExportRequest'
+        - type: object
+          properties:
+            delivery:
+              type: object
+              required: [method]
+              properties:
+                method:
+                  type: string
+                  enum: [email, s3, webhook]
+                config:
+                  type: object
+
+    ExportJob:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [pending, processing, completed, failed]
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+        result_url:
+          type: string
+        error:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+
+    # ===== Supporting Models =====
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        avatar_url:
+          type: string
+
+    Attachment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        filename:
+          type: string
+        content_type:
+          type: string
+        size_bytes:
+          type: integer
+        url:
+          type: string
+        uploaded_by:
+          $ref: '#/components/schemas/User'
+        uploaded_at:
+          type: string
+          format: date-time
+
+    TimeRange:
+      type: object
+      properties:
+        start:
+          type: string
+          format: date-time
+        end:
+          type: string
+          format: date-time
+
+    Error:
+      type: object
+      required: [error, message]
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+        request_id:
+          type: string
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    
+    Forbidden:
+      description: Forbidden
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    
+    NotFound:
+      description: Not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    
+    Conflict:
+      description: Conflict
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
