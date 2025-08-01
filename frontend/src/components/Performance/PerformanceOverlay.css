@@ -1,0 +1,441 @@
+/* Performance Overlay Styles */
+.performance-overlay {
+  position: fixed;
+  z-index: 10000;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', monospace;
+  font-size: 11px;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(10px);
+  min-width: 280px;
+  max-width: 360px;
+  max-height: 90vh;
+  overflow-y: auto;
+  user-select: none;
+  transition: all 0.2s ease;
+}
+
+/* Positioning */
+.performance-overlay--top-left {
+  top: 16px;
+  left: 16px;
+}
+
+.performance-overlay--top-right {
+  top: 16px;
+  right: 16px;
+}
+
+.performance-overlay--bottom-left {
+  bottom: 16px;
+  left: 16px;
+}
+
+.performance-overlay--bottom-right {
+  bottom: 16px;
+  right: 16px;
+}
+
+/* Theme Variants */
+.performance-overlay--dark {
+  background: rgba(17, 24, 39, 0.95);
+  border: 1px solid rgba(75, 85, 99, 0.3);
+  color: #f9fafb;
+}
+
+.performance-overlay--light {
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(209, 213, 219, 0.3);
+  color: #111827;
+}
+
+/* Minimized State */
+.performance-overlay--minimized {
+  min-width: auto;
+  width: auto;
+  padding: 0;
+}
+
+.performance-overlay--minimized .performance-overlay__header {
+  padding: 6px 12px;
+  cursor: pointer;
+  border-radius: 8px;
+}
+
+.performance-overlay--minimized .performance-overlay__header:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Header */
+.performance-overlay__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(107, 114, 128, 0.2);
+}
+
+.performance-overlay__header h3 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: inherit;
+}
+
+.performance-overlay__controls {
+  display: flex;
+  gap: 4px;
+}
+
+.control-button {
+  background: none;
+  border: none;
+  padding: 4px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 10px;
+  line-height: 1;
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
+}
+
+.control-button:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Content */
+.performance-overlay__content {
+  padding: 16px;
+}
+
+/* Performance Status (Minimized) */
+.performance-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.alert-indicator {
+  background: #dc2626;
+  color: white;
+  border-radius: 10px;
+  padding: 2px 6px;
+  font-size: 9px;
+  min-width: 16px;
+  text-align: center;
+}
+
+/* Metrics Sections */
+.metrics-section {
+  margin-bottom: 16px;
+}
+
+.metrics-section:last-child {
+  margin-bottom: 0;
+}
+
+.metrics-section h4 {
+  margin: 0 0 8px 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Primary Metrics Grid */
+.metrics-section:first-child {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.metric-card {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(107, 114, 128, 0.2);
+  border-radius: 6px;
+  padding: 10px;
+  text-align: center;
+}
+
+.performance-overlay--light .metric-card {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.metric-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.metric-label {
+  font-size: 9px;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.trend-indicator {
+  font-size: 10px;
+  font-weight: bold;
+}
+
+.trend-up {
+  color: #10b981;
+}
+
+.trend-down {
+  color: #ef4444;
+}
+
+.trend-stable {
+  color: #6b7280;
+}
+
+.metric-value {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.2;
+  margin-bottom: 2px;
+}
+
+.metric-sub {
+  font-size: 9px;
+  color: #9ca3af;
+  margin-bottom: 6px;
+}
+
+.metric-chart {
+  height: 20px;
+  margin-top: 6px;
+}
+
+.performance-mini-chart {
+  width: 100%;
+  height: 100%;
+}
+
+/* Advanced Metrics */
+.metrics-section--advanced .metric-row,
+.metric-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(107, 114, 128, 0.1);
+}
+
+.metric-row:last-child {
+  border-bottom: none;
+}
+
+.metric-row .metric-label {
+  font-size: 10px;
+  color: #9ca3af;
+}
+
+.metric-row .metric-value {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* Quality Settings */
+.quality-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.quality-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 3px 0;
+}
+
+.quality-label {
+  font-size: 10px;
+  color: #9ca3af;
+}
+
+.quality-value {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.quality-high {
+  background: #10b981;
+  color: white;
+}
+
+.quality-medium {
+  background: #f59e0b;
+  color: white;
+}
+
+.quality-low {
+  background: #ef4444;
+  color: white;
+}
+
+.quality-value.enabled {
+  color: #10b981;
+}
+
+.quality-value.disabled {
+  color: #9ca3af;
+}
+
+/* Alerts */
+.alerts-section h4 {
+  color: #fbbf24;
+}
+
+.alerts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.alert {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+}
+
+.alert--warning {
+  background: rgba(251, 191, 36, 0.1);
+  border: 1px solid rgba(251, 191, 36, 0.3);
+}
+
+.alert--critical {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.alert-icon {
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.alert-message {
+  flex: 1;
+  line-height: 1.3;
+}
+
+.alert-time {
+  font-size: 9px;
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+
+/* No Data State */
+.no-data {
+  text-align: center;
+  padding: 24px;
+  color: #9ca3af;
+}
+
+.no-data p {
+  margin: 0;
+  font-size: 11px;
+}
+
+.no-data-sub {
+  margin-top: 4px !important;
+  font-size: 10px !important;
+  opacity: 0.7;
+}
+
+/* Responsive */
+@media (max-height: 600px) {
+  .performance-overlay {
+    max-height: 80vh;
+  }
+}
+
+@media (max-width: 480px) {
+  .performance-overlay {
+    min-width: 240px;
+    max-width: calc(100vw - 32px);
+  }
+  
+  .performance-overlay--top-left,
+  .performance-overlay--top-right {
+    top: 8px;
+  }
+  
+  .performance-overlay--bottom-left,
+  .performance-overlay--bottom-right {
+    bottom: 8px;
+  }
+  
+  .performance-overlay--top-left,
+  .performance-overlay--bottom-left {
+    left: 8px;
+  }
+  
+  .performance-overlay--top-right,
+  .performance-overlay--bottom-right {
+    right: 8px;
+  }
+}
+
+/* Scrollbar Styling */
+.performance-overlay::-webkit-scrollbar {
+  width: 4px;
+}
+
+.performance-overlay::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.performance-overlay::-webkit-scrollbar-thumb {
+  background: rgba(107, 114, 128, 0.4);
+  border-radius: 2px;
+}
+
+.performance-overlay--dark::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.4);
+}
+
+.performance-overlay::-webkit-scrollbar-thumb:hover {
+  background: rgba(107, 114, 128, 0.6);
+}
+
+/* Animation for smooth transitions */
+.performance-overlay {
+  animation: fadeInUp 0.2s ease-out;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Hover effects */
+.metric-card:hover {
+  background: rgba(255, 255, 255, 0.08);
+  transform: translateY(-1px);
+  transition: all 0.2s ease;
+}
+
+.performance-overlay--light .metric-card:hover {
+  background: rgba(0, 0, 0, 0.06);
+}

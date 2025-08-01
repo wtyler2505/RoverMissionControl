@@ -1,0 +1,515 @@
+/**
+ * GridToolbar Styles - Control toolbar for grid operations
+ * Mission-critical toolbar interface for rover control
+ */
+
+.grid-toolbar {
+  --toolbar-bg: var(--color-background-elevated);
+  --toolbar-border: var(--color-divider);
+  --toolbar-text: var(--color-text-primary);
+  --toolbar-text-secondary: var(--color-text-secondary);
+  --toolbar-shadow: var(--shadow-sm);
+  --toolbar-radius: var(--border-radius-base);
+  --toolbar-transition: var(--transition-standard);
+  
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 60px;
+  padding: 0 var(--spacing-md);
+  background-color: var(--toolbar-bg);
+  border-bottom: 1px solid var(--toolbar-border);
+  box-shadow: var(--toolbar-shadow);
+  position: relative;
+  z-index: 100;
+  font-family: var(--font-family-primary);
+}
+
+/* Toolbar sections */
+.toolbar-section {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.toolbar-primary {
+  flex: 1;
+}
+
+.toolbar-info {
+  flex: 0 0 auto;
+  justify-content: center;
+}
+
+.toolbar-secondary {
+  flex: 0 0 auto;
+  justify-content: flex-end;
+}
+
+/* Toolbar buttons */
+.toolbar-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background: transparent;
+  border: 1px solid var(--toolbar-border);
+  border-radius: var(--toolbar-radius);
+  color: var(--toolbar-text);
+  font-size: 13px;
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: var(--toolbar-transition);
+  white-space: nowrap;
+  min-height: 36px;
+}
+
+.toolbar-btn:hover {
+  background-color: var(--color-primary-main)10;
+  border-color: var(--color-primary-main);
+  color: var(--color-primary-main);
+}
+
+.toolbar-btn:focus {
+  outline: 2px solid var(--color-primary-main);
+  outline-offset: -2px;
+}
+
+.toolbar-btn:active {
+  background-color: var(--color-primary-main)20;
+  transform: translateY(1px);
+}
+
+.toolbar-btn.primary {
+  background-color: var(--color-primary-main);
+  border-color: var(--color-primary-main);
+  color: var(--color-primary-contrast);
+}
+
+.toolbar-btn.primary:hover {
+  background-color: var(--color-primary-dark);
+  border-color: var(--color-primary-dark);
+}
+
+.toolbar-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Toolbar actions group */
+.toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  margin-left: var(--spacing-sm);
+}
+
+/* Dropdown container */
+.toolbar-dropdown {
+  position: relative;
+}
+
+.dropdown-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 320px;
+  max-width: 400px;
+  background: var(--toolbar-bg);
+  border: 1px solid var(--toolbar-border);
+  border-radius: var(--toolbar-radius);
+  box-shadow: var(--shadow-lg);
+  z-index: 1000;
+  overflow: hidden;
+  animation: dropdownSlide 0.2s ease-out;
+}
+
+@keyframes dropdownSlide {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.dropdown-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 999;
+  background: transparent;
+}
+
+/* Dropdown header */
+.dropdown-header {
+  padding: var(--spacing-sm);
+  border-bottom: 1px solid var(--toolbar-border);
+  background: var(--color-background-default);
+}
+
+.category-filters {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.category-btn {
+  padding: 4px 8px;
+  font-size: 11px;
+  border: 1px solid var(--toolbar-border);
+  border-radius: var(--border-radius-sm);
+  background: transparent;
+  color: var(--toolbar-text-secondary);
+  cursor: pointer;
+  transition: var(--toolbar-transition);
+  white-space: nowrap;
+}
+
+.category-btn:hover {
+  background-color: var(--color-primary-main)10;
+  border-color: var(--color-primary-main);
+  color: var(--color-primary-main);
+}
+
+.category-btn.active {
+  background-color: var(--color-primary-main);
+  border-color: var(--color-primary-main);
+  color: var(--color-primary-contrast);
+}
+
+/* Panel types list */
+.panel-types-list {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.panel-types-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.panel-types-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.panel-types-list::-webkit-scrollbar-thumb {
+  background: var(--toolbar-border);
+  border-radius: 3px;
+}
+
+.panel-type-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+  width: 100%;
+  padding: var(--spacing-sm);
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: var(--toolbar-transition);
+  border-bottom: 1px solid var(--toolbar-border)50;
+}
+
+.panel-type-item:hover {
+  background-color: var(--color-primary-main)08;
+}
+
+.panel-type-item:focus {
+  outline: 2px solid var(--color-primary-main);
+  outline-offset: -2px;
+  background-color: var(--color-primary-main)10;
+}
+
+.panel-type-item:last-child {
+  border-bottom: none;
+}
+
+.panel-type-icon {
+  font-size: 20px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-background-default);
+  border-radius: var(--border-radius-sm);
+  flex-shrink: 0;
+}
+
+.panel-type-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.panel-type-name {
+  font-size: 14px;
+  font-weight: var(--font-weight-medium);
+  color: var(--toolbar-text);
+  margin-bottom: 2px;
+}
+
+.panel-type-description {
+  font-size: 12px;
+  color: var(--toolbar-text-secondary);
+  line-height: 1.3;
+  margin-bottom: 4px;
+}
+
+.panel-type-size {
+  font-size: 10px;
+  color: var(--toolbar-text-secondary);
+  font-family: var(--font-family-mono);
+  opacity: 0.8;
+}
+
+/* Info items */
+.info-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: 13px;
+  color: var(--toolbar-text-secondary);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background: var(--color-background-default);
+  border-radius: var(--toolbar-radius);
+  border: 1px solid var(--toolbar-border);
+}
+
+.info-item svg {
+  opacity: 0.7;
+}
+
+/* Breakpoint info */
+.breakpoint-info {
+  gap: var(--spacing-sm);
+}
+
+.breakpoint-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 20px;
+  font-size: 10px;
+  font-weight: var(--font-weight-bold);
+  border-radius: var(--border-radius-sm);
+  font-family: var(--font-family-mono);
+  color: white;
+}
+
+.breakpoint-indicator.lg {
+  background-color: var(--color-success-main);
+}
+
+.breakpoint-indicator.md {
+  background-color: var(--color-info-main);
+}
+
+.breakpoint-indicator.sm {
+  background-color: var(--color-warning-main);
+}
+
+.breakpoint-indicator.xs {
+  background-color: var(--color-error-main);
+}
+
+.breakpoint-indicator.xxs {
+  background-color: var(--color-secondary-main);
+}
+
+.breakpoint-label {
+  font-size: 11px;
+  color: var(--toolbar-text-secondary);
+}
+
+/* Theme-specific styles */
+.grid-toolbar.dark {
+  --toolbar-bg: var(--color-background-elevated);
+  --toolbar-border: rgba(255, 255, 255, 0.12);
+  --toolbar-text: var(--color-text-primary);
+}
+
+.grid-toolbar.high-contrast {
+  border-bottom-width: 2px;
+}
+
+.grid-toolbar.high-contrast .toolbar-btn {
+  border-width: 2px;
+}
+
+.grid-toolbar.mission-critical {
+  --toolbar-bg: #000000;
+  --toolbar-border: #ff1744;
+  --toolbar-text: #ffffff;
+  border-bottom-color: #ff1744;
+  box-shadow: 0 0 10px rgba(255, 23, 68, 0.3);
+}
+
+.grid-toolbar.mission-critical .toolbar-btn {
+  border-color: #ff1744;
+  color: #ffffff;
+}
+
+.grid-toolbar.mission-critical .toolbar-btn:hover {
+  background-color: rgba(255, 23, 68, 0.2);
+  color: #ff5252;
+}
+
+.grid-toolbar.mission-critical .toolbar-btn.primary {
+  background-color: #ff1744;
+  border-color: #ff1744;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1366px) {
+  .grid-toolbar {
+    height: 50px;
+    padding: 0 var(--spacing-sm);
+  }
+  
+  .toolbar-btn {
+    min-height: 32px;
+    padding: 6px var(--spacing-sm);
+    font-size: 12px;
+  }
+  
+  .dropdown-menu {
+    min-width: 280px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .grid-toolbar {
+    height: 45px;
+    padding: 0 var(--spacing-sm);
+  }
+  
+  .toolbar-section {
+    gap: var(--spacing-xs);
+  }
+  
+  .toolbar-btn span {
+    display: none;
+  }
+  
+  .toolbar-btn {
+    min-width: 36px;
+    padding: var(--spacing-xs);
+  }
+  
+  .dropdown-menu {
+    min-width: 260px;
+  }
+  
+  .info-item {
+    font-size: 12px;
+    padding: 4px var(--spacing-xs);
+  }
+}
+
+@media (max-width: 768px) {
+  .grid-toolbar {
+    height: 40px;
+    padding: 0 var(--spacing-xs);
+  }
+  
+  .toolbar-info {
+    display: none;
+  }
+  
+  .toolbar-secondary .toolbar-btn:not(.primary) {
+    display: none;
+  }
+  
+  .dropdown-menu {
+    min-width: 240px;
+    right: 0;
+    left: auto;
+  }
+}
+
+@media (max-width: 480px) {
+  .grid-toolbar {
+    height: 35px;
+    padding: 0 var(--spacing-xs);
+  }
+  
+  .toolbar-btn {
+    min-width: 32px;
+    min-height: 28px;
+  }
+  
+  .toolbar-actions {
+    gap: 2px;
+  }
+  
+  .dropdown-menu {
+    min-width: calc(100vw - 32px);
+    max-width: calc(100vw - 32px);
+    left: 50%;
+    transform: translateX(-50%);
+  }
+  
+  .panel-type-item {
+    padding: var(--spacing-xs);
+  }
+  
+  .panel-type-icon {
+    width: 24px;
+    height: 24px;
+    font-size: 16px;
+  }
+  
+  .panel-type-name {
+    font-size: 13px;
+  }
+  
+  .panel-type-description {
+    font-size: 11px;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .dropdown-menu {
+    animation: none;
+  }
+  
+  .toolbar-btn,
+  .panel-type-item,
+  .category-btn {
+    transition: none;
+  }
+}
+
+/* High contrast support */
+@media (prefers-contrast: high) {
+  .grid-toolbar {
+    border-bottom-width: 2px;
+  }
+  
+  .toolbar-btn {
+    border-width: 2px;
+  }
+  
+  .dropdown-menu {
+    border-width: 2px;
+  }
+  
+  .panel-type-item:focus {
+    outline-width: 3px;
+  }
+}
+
+/* Print styles */
+@media print {
+  .grid-toolbar {
+    display: none;
+  }
+}

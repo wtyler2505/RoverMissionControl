@@ -1,0 +1,237 @@
+/* Resource Preloader Styles */
+
+.resource-preloader {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: var(--gradient-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  font-family: var(--font-sans);
+}
+
+.preloader-container {
+  text-align: center;
+  max-width: 400px;
+  padding: 2rem;
+}
+
+/* Rover Logo Animation */
+.rover-logo {
+  margin-bottom: 2rem;
+}
+
+.logo-animation {
+  font-size: 4rem;
+  animation: float 3s ease-in-out infinite;
+  filter: drop-shadow(0 4px 8px rgba(59, 130, 246, 0.3));
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-10px) rotate(5deg); }
+}
+
+/* Title */
+.preloader-title {
+  color: var(--text-primary);
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 2rem;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  letter-spacing: 1px;
+}
+
+/* Progress Bar */
+.loading-progress {
+  margin-bottom: 2rem;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 0.75rem;
+  border: 1px solid var(--border-color);
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-blue), var(--accent-green));
+  border-radius: 3px;
+  transition: width 0.3s ease;
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+  position: relative;
+}
+
+.progress-fill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    45deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.3) 50%,
+    transparent 70%
+  );
+  animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.progress-text {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+/* Loading Details */
+.loading-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.detail-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  font-size: 0.9rem;
+  transition: all 0.3s ease;
+}
+
+.detail-item.loading {
+  color: var(--text-secondary);
+  border-color: var(--border-color);
+}
+
+.detail-item.complete {
+  color: var(--status-good);
+  border-color: rgba(16, 185, 129, 0.3);
+  background: rgba(16, 185, 129, 0.1);
+  transform: scale(1.02);
+}
+
+.detail-item .icon {
+  font-size: 1rem;
+  min-width: 20px;
+}
+
+.detail-item.loading .icon {
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Error State */
+.preloader-error {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: 8px;
+  color: var(--status-warning);
+  font-size: 0.8rem;
+  margin-top: 1rem;
+}
+
+.error-icon {
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.error-message {
+  line-height: 1.4;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .preloader-container {
+    padding: 1rem;
+    max-width: 320px;
+  }
+  
+  .logo-animation {
+    font-size: 3rem;
+  }
+  
+  .preloader-title {
+    font-size: 1.25rem;
+    margin-bottom: 1.5rem;
+  }
+  
+  .loading-details {
+    gap: 0.5rem;
+  }
+  
+  .detail-item {
+    padding: 0.5rem;
+    font-size: 0.8rem;
+  }
+}
+
+/* Dark Theme Optimizations */
+@media (prefers-color-scheme: dark) {
+  .resource-preloader {
+    background: radial-gradient(circle at center, #1a1f2e 0%, #0a0e1a 100%);
+  }
+}
+
+/* High Contrast Mode */
+@media (prefers-contrast: high) {
+  .progress-bar {
+    border-width: 2px;
+  }
+  
+  .detail-item {
+    border-width: 2px;
+  }
+  
+  .detail-item.complete {
+    background: var(--status-good);
+    color: var(--bg-primary);
+  }
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  .logo-animation,
+  .progress-fill::after,
+  .detail-item.loading .icon {
+    animation: none;
+  }
+  
+  .progress-fill,
+  .detail-item {
+    transition: none;
+  }
+}
+
+/* Print Styles */
+@media print {
+  .resource-preloader {
+    display: none;
+  }
+}

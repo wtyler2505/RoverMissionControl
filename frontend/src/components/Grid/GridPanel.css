@@ -1,0 +1,537 @@
+/**
+ * GridPanel Styles - Individual panel styling with accessibility
+ * Mission-critical panel interface for rover control
+ */
+
+.grid-panel {
+  --panel-bg: var(--panel-bg-color, var(--color-background-paper));
+  --panel-border: var(--panel-border-color, var(--color-divider));
+  --panel-accent: var(--panel-accent-color, var(--color-primary-main));
+  --panel-text: var(--panel-text-color, var(--color-text-primary));
+  --panel-text-secondary: var(--color-text-secondary);
+  --panel-shadow: var(--shadow-base);
+  --panel-radius: var(--border-radius-base);
+  --panel-transition: var(--transition-standard);
+  
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background-color: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--panel-radius);
+  box-shadow: var(--panel-shadow);
+  transition: var(--panel-transition);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  font-family: var(--font-family-primary);
+}
+
+/* Panel states */
+.grid-panel:hover {
+  border-color: var(--panel-accent);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+.grid-panel:focus {
+  outline: 2px solid var(--panel-accent);
+  outline-offset: -2px;
+}
+
+.grid-panel:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.grid-panel.dragging {
+  box-shadow: var(--shadow-xl);
+  transform: scale(1.02);
+  z-index: 1000;
+  border-color: var(--panel-accent);
+}
+
+.grid-panel.hovered .panel-controls {
+  opacity: 1;
+  visibility: visible;
+}
+
+.grid-panel.minimized {
+  height: 60px !important;
+  min-height: 60px !important;
+}
+
+.grid-panel.maximized {
+  z-index: 999;
+  box-shadow: var(--shadow-xl);
+}
+
+/* Panel header */
+.panel-header {
+  display: flex;
+  align-items: center;
+  padding: var(--spacing-sm);
+  background: linear-gradient(135deg, var(--panel-bg) 0%, var(--panel-accent)08 100%);
+  border-bottom: 1px solid var(--panel-border);
+  min-height: 44px;
+  position: relative;
+  z-index: 10;
+}
+
+.panel-drag-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  margin-right: var(--spacing-xs);
+  color: var(--panel-text-secondary);
+  cursor: grab;
+  border-radius: var(--border-radius-sm);
+  transition: var(--panel-transition);
+  flex-shrink: 0;
+}
+
+.panel-drag-handle:hover {
+  background-color: var(--panel-accent)20;
+  color: var(--panel-accent);
+}
+
+.panel-drag-handle:active {
+  cursor: grabbing;
+  background-color: var(--panel-accent)30;
+}
+
+.panel-drag-handle:focus {
+  outline: 2px solid var(--panel-accent);
+  outline-offset: -2px;
+}
+
+/* Panel info section */
+.panel-info {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+}
+
+.panel-icon {
+  font-size: 16px;
+  margin-right: var(--spacing-xs);
+  flex-shrink: 0;
+}
+
+.panel-title-container {
+  flex: 1;
+  min-width: 0;
+}
+
+.panel-title {
+  font-size: 14px;
+  font-weight: var(--font-weight-medium);
+  color: var(--panel-text);
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+}
+
+.panel-size-info {
+  font-size: 11px;
+  color: var(--panel-text-secondary);
+  margin-top: 2px;
+}
+
+/* Panel controls */
+.panel-controls {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease, visibility 0.2s ease;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.panel-controls.visible {
+  opacity: 1;
+  visibility: visible;
+}
+
+.panel-control-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  color: var(--panel-text-secondary);
+  cursor: pointer;
+  border-radius: var(--border-radius-sm);
+  transition: var(--panel-transition);
+  padding: 0;
+}
+
+.panel-control-btn:hover {
+  background-color: var(--panel-accent)20;
+  color: var(--panel-accent);
+}
+
+.panel-control-btn:focus {
+  outline: 2px solid var(--panel-accent);
+  outline-offset: -2px;
+}
+
+.panel-control-btn.settings:hover {
+  background-color: var(--color-info-main)20;
+  color: var(--color-info-main);
+}
+
+.panel-control-btn.minimize:hover {
+  background-color: var(--color-warning-main)20;
+  color: var(--color-warning-main);
+}
+
+.panel-control-btn.maximize:hover {
+  background-color: var(--color-success-main)20;
+  color: var(--color-success-main);
+}
+
+.panel-control-btn.remove:hover {
+  background-color: var(--color-error-main)20;
+  color: var(--color-error-main);
+}
+
+/* Panel content */
+.panel-content {
+  flex: 1;
+  padding: var(--spacing-sm);
+  overflow: auto;
+  position: relative;
+  background-color: var(--panel-bg);
+}
+
+.panel-content::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.panel-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.panel-content::-webkit-scrollbar-thumb {
+  background: var(--panel-text-secondary)40;
+  border-radius: 3px;
+}
+
+.panel-content::-webkit-scrollbar-thumb:hover {
+  background: var(--panel-text-secondary)60;
+}
+
+/* Panel placeholder */
+.panel-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--panel-text-secondary);
+  text-align: center;
+}
+
+.placeholder-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-sm);
+  max-width: 200px;
+}
+
+.placeholder-icon {
+  font-size: 32px;
+  opacity: 0.6;
+}
+
+.placeholder-text h4 {
+  margin: 0 0 var(--spacing-xs) 0;
+  font-size: 16px;
+  color: var(--panel-text);
+}
+
+.placeholder-text p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--panel-text-secondary);
+}
+
+.placeholder-info {
+  font-size: 10px;
+  color: var(--panel-text-secondary);
+  opacity: 0.7;
+  font-family: var(--font-family-mono);
+}
+
+/* Resize handles */
+.resize-handles {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 20;
+}
+
+.resize-handle {
+  position: absolute;
+  background: var(--panel-accent);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+}
+
+.grid-panel:hover .resize-handle,
+.grid-panel.dragging .resize-handle {
+  opacity: 0.6;
+}
+
+.resize-handle-se {
+  bottom: 0;
+  right: 0;
+  width: 12px;
+  height: 12px;
+  border-radius: 12px 0 0 0;
+}
+
+.resize-handle-sw {
+  bottom: 0;
+  left: 0;
+  width: 12px;
+  height: 12px;
+  border-radius: 0 12px 0 0;
+}
+
+.resize-handle-ne {
+  top: 0;
+  right: 0;
+  width: 12px;
+  height: 12px;
+  border-radius: 0 0 0 12px;
+}
+
+.resize-handle-nw {
+  top: 0;
+  left: 0;
+  width: 12px;
+  height: 12px;
+  border-radius: 0 0 12px 0;
+}
+
+/* Panel overlays */
+.panel-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  z-index: 100;
+  gap: var(--spacing-sm);
+}
+
+.panel-overlay.loading {
+  background: var(--panel-bg)90;
+  color: var(--panel-text);
+}
+
+.panel-overlay.error {
+  background: var(--color-error-main)10;
+  color: var(--color-error-main);
+  border: 2px solid var(--color-error-main);
+}
+
+.loading-spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid currentColor;
+  border-top: 2px solid transparent;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.error-icon {
+  font-size: 24px;
+}
+
+/* Panel type specific styles */
+.panel-type-telemetry {
+  --panel-accent-color: var(--color-telemetry);
+}
+
+.panel-type-control {
+  --panel-accent-color: var(--color-command);
+}
+
+.panel-type-visualization {
+  --panel-accent-color: var(--color-info-main);
+}
+
+.panel-type-status {
+  --panel-accent-color: var(--color-success-main);
+}
+
+.panel-type-communication {
+  --panel-accent-color: var(--color-secondary-main);
+}
+
+/* Theme-specific adjustments */
+.grid-panel.dark {
+  --panel-bg: var(--color-background-paper);
+  --panel-border: rgba(255, 255, 255, 0.12);
+  --panel-text: var(--color-text-primary);
+}
+
+.grid-panel.high-contrast {
+  border-width: 2px;
+  box-shadow: none;
+}
+
+.grid-panel.high-contrast:hover {
+  border-width: 3px;
+}
+
+.grid-panel.mission-critical {
+  --panel-bg: #0a0a0a;
+  --panel-border: #ff1744;
+  --panel-text: #ffffff;
+  font-family: var(--font-family-mono);
+}
+
+.grid-panel.mission-critical .panel-header {
+  background: linear-gradient(135deg, #000000 0%, #ff174408 100%);
+}
+
+/* Responsive adjustments */
+@media (max-width: 1024px) {
+  .panel-header {
+    padding: var(--spacing-xs);
+    min-height: 40px;
+  }
+  
+  .panel-content {
+    padding: var(--spacing-xs);
+  }
+  
+  .panel-title {
+    font-size: 13px;
+  }
+  
+  .panel-size-info {
+    font-size: 10px;
+  }
+}
+
+@media (max-width: 768px) {
+  .panel-controls {
+    opacity: 1;
+    visibility: visible;
+  }
+  
+  .panel-control-btn {
+    width: 28px;
+    height: 28px;
+  }
+  
+  .resize-handle {
+    width: 16px;
+    height: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .panel-header {
+    padding: 6px;
+    min-height: 36px;
+  }
+  
+  .panel-drag-handle {
+    width: 20px;
+    height: 20px;
+  }
+  
+  .panel-title {
+    font-size: 12px;
+  }
+  
+  .placeholder-icon {
+    font-size: 24px;
+  }
+  
+  .placeholder-text h4 {
+    font-size: 14px;
+  }
+  
+  .placeholder-text p {
+    font-size: 11px;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .grid-panel,
+  .panel-control-btn,
+  .panel-drag-handle,
+  .resize-handle,
+  .loading-spinner {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* High contrast support */
+@media (prefers-contrast: high) {
+  .grid-panel {
+    border-width: 2px;
+  }
+  
+  .panel-header {
+    border-bottom-width: 2px;
+  }
+  
+  .panel-control-btn:focus {
+    outline-width: 3px;
+  }
+}
+
+/* Print styles */
+@media print {
+  .grid-panel {
+    break-inside: avoid;
+    box-shadow: none;
+    border: 1px solid #000;
+  }
+  
+  .panel-controls,
+  .resize-handles,
+  .panel-drag-handle {
+    display: none;
+  }
+  
+  .panel-header {
+    background: none;
+    border-bottom: 1px solid #000;
+  }
+}

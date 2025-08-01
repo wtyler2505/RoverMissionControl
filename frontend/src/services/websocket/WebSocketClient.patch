@@ -1,0 +1,176 @@
+--- WebSocketClient.ts.original
++++ WebSocketClient.ts.enhanced
+@@ -23,6 +23,7 @@ import {
+ } from './types';
+ import { ConnectionManager } from './ConnectionManager';
+ import { MessageQueue } from './MessageQueue';
++import { ReconnectionManager, ReconnectionConfig, ReconnectionStrategy } from './ReconnectionManager';
+ 
+ /**
+  * Default configuration for WebSocket client
+@@ -49,6 +50,18 @@ const DEFAULT_CONFIG: WebSocketConfig = {
+     enableMetrics: true,
+     metricsInterval: 5000,
+     latencyThreshold: 1000
++  },
++  reconnection: {
++    strategy: ReconnectionStrategy.EXPONENTIAL,
++    baseDelay: 500,
++    maxDelay: 30000,
++    maxAttempts: 10,
++    factor: 2,
++    jitterType: 'equal',
++    jitterFactor: 0.3,
++    resetTimeout: 60000,
++    circuitBreakerThreshold: 5,
++    circuitBreakerTimeout: 30000,
++    enableTelemetry: true
+   }
+ };
+ 
+@@ -60,6 +73,7 @@ export class WebSocketClient implements IWebSocketClient {
+   private socket?: Socket;
+   private connectionManager: ConnectionManager;
+   private messageQueue: MessageQueue;
++  private reconnectionManager: ReconnectionManager;
+   private eventHandlers: WebSocketEventHandlers = {};
+   private subscriptions = new Map<string, SubscriptionConfig>();
+   private protocolNegotiation?: ProtocolNegotiation;
+@@ -72,9 +86,11 @@ export class WebSocketClient implements IWebSocketClient {
+     // Initialize managers
+     this.connectionManager = new ConnectionManager(this.config);
+     this.messageQueue = new MessageQueue(this.config);
++    this.reconnectionManager = new ReconnectionManager(this.config.reconnection);
+     
+     // Setup manager callbacks
+     this.setupManagerCallbacks();
++    this.setupReconnectionCallbacks();
+   }
+ 
+   /**
+@@ -110,6 +126,10 @@ export class WebSocketClient implements IWebSocketClient {
+       
+     } catch (error) {
+       this.connectionManager.onDisconnected(error as Error);
++      // Trigger reconnection if enabled
++      if (this.config.reconnect && !this.manualDisconnect) {
++        this.startReconnection();
++      }
+       throw error;
+     }
+   }
+@@ -275,7 +295,11 @@ export class WebSocketClient implements IWebSocketClient {
+ 
+     this.socket.on('disconnect', (reason) => {
+       this.stopHeartbeat();
+-      this.connectionManager.onDisconnected(new Error(reason));
++      const error = new Error(reason);
++      this.connectionManager.onDisconnected(error);
++      if (!this.manualDisconnect && this.config.reconnect) {
++        this.startReconnection();
++      }
+     });
+ 
+     this.socket.on('connect_error', (error: Error) => {
+@@ -345,10 +369,96 @@ export class WebSocketClient implements IWebSocketClient {
+   /**
+    * Disconnect from WebSocket server
+    */
+   async disconnect(): Promise<void> {
++    this.manualDisconnect = true;
++    this.reconnectionManager.cancelReconnect();
++    
+     if (this.socket) {
+       this.socket.disconnect();
+       this.socket = undefined;
+     }
+     
+     this.messageQueue.stopProcessing();
+     this.connectionManager.setState(ConnectionState.DISCONNECTED);
+   }
++
++  /**
++   * Setup reconnection manager callbacks
++   */
++  private setupReconnectionCallbacks(): void {
++    this.reconnectionManager.on('reconnect-attempt', async () => {
++      try {
++        await this.performReconnect();
++      } catch (error) {
++        this.reconnectionManager.onReconnectFailure(error as WebSocketError);
++      }
++    });
++
++    this.reconnectionManager.on('reconnect-success', () => {
++      this.isReconnecting = false;
++      this.connectionManager.setState(ConnectionState.CONNECTED);
++      this.emit('reconnected', { 
++        attempts: this.reconnectionManager.getMetrics().totalAttempts 
++      });
++    });
++
++    this.reconnectionManager.on('circuit-breaker-open', (error) => {
++      this.connectionManager.setState(ConnectionState.ERROR);
++      this.emit('error', error);
++    });
++
++    this.reconnectionManager.on('max-attempts-reached', (error) => {
++      this.connectionManager.setState(ConnectionState.ERROR);
++      this.emit('error', error);
++    });
++  }
++
++  /**
++   * Start reconnection process
++   */
++  private async startReconnection(): Promise<void> {
++    if (this.isReconnecting || !this.reconnectionManager.canReconnect()) {
++      return;
++    }
++
++    this.isReconnecting = true;
++    this.connectionManager.setState(ConnectionState.RECONNECTING);
++
++    try {
++      await this.reconnectionManager.scheduleReconnect();
++    } catch (error) {
++      this.isReconnecting = false;
++      this.connectionManager.setState(ConnectionState.ERROR);
++      this.emit('error', error);
++    }
++  }
++
++  /**
++   * Perform actual reconnection
++   */
++  private async performReconnect(): Promise<void> {
++    try {
++      if (this.socket) {
++        this.socket.removeAllListeners();
++        this.socket.disconnect();
++        this.socket = undefined;
++      }
++
++      await this.setupSocket({});
++      await this.negotiateProtocol();
++      
++      const authData = this.getStoredAuthData();
++      if (this.config.auth.enabled && authData) {
++        await this.authenticate(authData);
++      }
++      
++      await this.restoreSubscriptions();
++      this.messageQueue.processQueue();
++      this.reconnectionManager.onReconnectSuccess();
++      
++    } catch (error) {
++      throw error;
++    }
++  }
++
++  /**
++   * Get reconnection manager
++   */
++  getReconnectionManager(): ReconnectionManager {
++    return this.reconnectionManager;
++  }
