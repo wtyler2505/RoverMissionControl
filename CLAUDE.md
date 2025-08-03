@@ -1,45 +1,132 @@
 # CLAUDE.md - Critical Instructions for Claude
 
-## 🚨 IMMEDIATE PROBLEM-SOLVING PROTOCOL - HIGHEST PRIORITY
+## 🚀 Quick Start - Common Tasks
 
-### 🔥 MANDATORY: Fix Problems IMMEDIATELY When They Occur
+### Starting Work on a Task
+```bash
+# 1. Check what to work on
+mcp__taskmaster-ai__next_task
 
-**RULE #1: STOP EVERYTHING AND FIX ISSUES AS SOON AS THEY HAPPEN**
+# 2. Create worktree for the task
+scripts\create-task-worktree.bat
 
-When ANY issue occurs during a session:
+# 3. Start work (Taskmaster auto-updates)
+mcp__taskmaster-ai__set_task_status --id=<ID> --status=in-progress
+```
 
-1. **STOP** whatever current work you're doing immediately
-2. **IDENTIFY** the root cause of the issue 
-3. **FIX** the issue completely before continuing with any other work
-4. **VERIFY** the fix works properly
-5. **DOCUMENT** what went wrong and how it was fixed
-6. **ONLY THEN** continue with the original task
+### Continuing Previous Work
+```bash
+# In the worktree directory
+claude --resume
+# or check task status
+mcp__taskmaster-ai__get_task --id=<YOUR_TASK_ID>
+```
+
+### Quick Commands Reference
+- **Next task**: `next_task` 
+- **Update status**: `set_status <id> <status>`
+- **Update progress**: `update_task <id> "<what you did>"`
+- **Check worktrees**: `scripts\worktree-status.bat`
+
+---
+
+## 🔧 Problem-Solving Protocol - Fix Issues Before Continuing
+
+### Handling Issues Effectively with Cognitive Tools
+
+**Core Principle: Address problems systematically using clear-thought tools**
+
+When you encounter ANY issue, IMMEDIATELY invoke:
+```bash
+mcp__clear-thought__debuggingapproach --approachName='[best_approach]' --issue='[describe_issue]'
+```
+
+**Enhanced Problem-Solving Steps:**
+
+1. **PAUSE & ANALYZE** 
+   - Stop current work immediately
+   - Invoke: `mcp__clear-thought__debuggingapproach --approachName='cause_elimination' --issue='[issue]'`
+   
+2. **DIAGNOSE SYSTEMATICALLY**
+   - Use the debugging approach suggested by the tool
+   - For complex issues: `mcp__clear-thought__sequentialthinking --thought='Breaking down the problem' --thoughtNumber=1 --totalThoughts=5`
+   
+3. **RESOLVE WITH CONFIDENCE**
+   - Implement the fix following the systematic approach
+   - Track confidence: `mcp__clear-thought__metacognitivemonitoring --task='Fixing [issue]' --stage='execution'`
+   
+4. **VERIFY THOROUGHLY**
+   - Test the solution completely
+   - Use: `mcp__clear-thought__scientificmethod --stage='experiment' --question='Does fix resolve issue?'`
+   
+5. **DOCUMENT INSIGHTS**
+   - Record what was learned
+   - Update relevant documentation
+   
+6. **RESUME WITH CONTEXT**
+   - Return to original task with clear understanding
+
+### 🧠 Automatic Debugging Approaches
+
+Based on issue type, use these approaches:
+
+| Issue Type | Debugging Approach | When to Use |
+|------------|-------------------|-------------|
+| **Import/Module Errors** | `cause_elimination` | Missing dependencies, path issues |
+| **Intermittent Failures** | `binary_search` | Isolate when/where it occurs |
+| **Performance Issues** | `program_slicing` | Identify bottlenecks |
+| **Logic Errors** | `backtracking` | Trace execution path |
+| **Integration Issues** | `divide_conquer` | Test components separately |
+| **Unknown Errors** | `reverse_engineering` | Work from error backwards |
+
+This ensures systematic, reliable problem resolution that builds knowledge.
+
+---
+
+## 🧠 Cognitive Enhancement Protocol
+
+See `docs/COGNITIVE_TOOLS.md` for detailed clear-thought tool usage, triggers, and examples.
+
+**Quick Reference:**
+- **Debugging**: `mcp__clear-thought__debuggingapproach`
+- **Planning**: `mcp__clear-thought__sequentialthinking`
+- **Decisions**: `mcp__clear-thought__decisionframework`
+- **Confidence**: `mcp__clear-thought__metacognitivemonitoring`
+
 
 ### 📋 COMMON ISSUES THAT MUST BE FIXED IMMEDIATELY:
 
-#### 🌳 Worktree Issues
-- **Symptom**: Worktree exists but can't access it or dependencies missing
-- **Action**: IMMEDIATELY run the correct setup script:
+#### 🐍 Python Version Mismatch
+- **Symptom**: `RuntimeError: failed to find interpreter for Builtin discover of python_spec='python3.11'`
+- **Action**: 
+  1. Check installed Python: `python --version`
+  2. Update `.pre-commit-config.yaml` to match your version
+  3. Or install required version
+- **Verification**: Run `pre-commit run --all-files`
+
+#### 🔑 GitHub API Permission Denied
+- **Symptom**: `Permission Denied: Resource not accessible by personal access token`
+- **Action**:
+  1. Check token permissions in GitHub settings
+  2. Ensure token has required scopes (repo, workflow)
+  3. Update MCP configuration if needed
+- **Verification**: `mcp__github__search_repositories --query="user:yourusername"`
+
+#### 🌳 Worktree Already Checked Out
+- **Symptom**: `fatal: branch already checked out`
+- **Action**:
+  1. Find existing worktree: `git worktree list | grep <branch>`
+  2. Remove if needed: `git worktree remove <path>`
+  3. Or use different branch name
+- **Verification**: `git worktree list`
+
+#### 📦 Module Not Found in Worktree
+- **Symptom**: Import errors after creating worktree
+- **Action**: Run setup immediately:
   ```bash
-  # From main worktree:
-  scripts\worktree-setup-secure.bat "C:\Users\wtyle\rover-[name]" [task-id]
+  scripts\worktree-setup-secure.bat "." <task-id>
   ```
-- **Verification**: Confirm all dependencies installed and environment files exist
-
-#### 🔧 Dependency Issues  
-- **Symptom**: Import errors, missing packages, build failures
-- **Action**: IMMEDIATELY install missing dependencies in correct environment
-- **Verification**: Run tests or build to confirm everything works
-
-#### 📝 File Access Issues
-- **Symptom**: Can't read/write files, permission errors
-- **Action**: IMMEDIATELY check file paths, permissions, and fix access issues
-- **Verification**: Successfully complete the intended file operation
-
-#### 🔗 API/Service Issues
-- **Symptom**: Network errors, service unavailable, authentication failures  
-- **Action**: IMMEDIATELY check service status, credentials, and connectivity
-- **Verification**: Successfully connect to and use the service
+- **Verification**: Test imports in both frontend and backend
 
 ### ❌ WHAT NOT TO DO - FORBIDDEN BEHAVIORS:
 
@@ -68,14 +155,19 @@ When ANY issue occurs during a session:
 
 ---
 
-## 🌳 Git Worktrees - CRITICAL PARALLEL DEVELOPMENT SETUP
+## 🌳 Git Worktrees - CRITICAL PARALLEL DEVELOPMENT
 
-### 🚨 MANDATORY: Understanding Git Worktrees
-Git worktrees allow multiple branches to be checked out simultaneously in separate directories. This enables:
-- **Parallel Claude Sessions**: Run multiple AI assistants on different features
-- **Zero Context Switching**: No stashing, no branch switching, no lost work
-- **Complete Isolation**: Each worktree has its own file state and dependencies
-- **Shared Repository**: All worktrees share the same Git history and commits
+See `docs/WORKTREE_GUIDE.md` for complete worktree documentation.
+
+**Quick Setup:**
+```bash
+# Automated (best for new features)
+scripts\create-task-worktree.bat
+
+# Manual with secure setup
+git worktree add ../rover-<name> -b feature/<name>
+scripts\worktree-setup-secure.bat "C:\Users\wtyle\rover-<name>" <task-id>
+```
 
 ### 📍 Current Active Worktrees
 | Worktree | Location | Branch | Purpose | Taskmaster Task |
@@ -87,20 +179,41 @@ Git worktrees allow multiple branches to be checked out simultaneously in separa
 
 ### 🎯 CRITICAL WORKFLOW: Using Worktrees with Claude
 
-#### 1. Starting a New Feature in a Worktree
+#### 1. Starting a New Feature in a Worktree - With Intelligent Planning
+
+**FIRST: Use decision framework to plan approach:**
 ```bash
+# Analyze if worktree is needed
+mcp__clear-thought__decisionframework \
+  --decisionStatement='Create worktree vs work in main for Task [ID]' \
+  --options='[{"name": "New Worktree", "description": "Isolated environment"}, {"name": "Main Branch", "description": "Quick changes"}]'
+
+# If complex feature, break down the work
+mcp__clear-thought__sequentialthinking \
+  --thought='Planning worktree setup for [feature]' \
+  --totalThoughts=4
+```
+
+**THEN: Create worktree with clarity:**
+```bash
+# PREFERRED METHOD: Use automated task-based creation
+scripts\create-task-worktree.bat
+# This will:
+# - Ask for task ID
+# - Create worktree with proper naming
+# - Run secure setup automatically
+# - Update Taskmaster
+
+# MANUAL METHOD: If you need specific control
 # STEP 1: Create worktree for your task
 git worktree add ../rover-gamepad -b feature/gamepad-control
 
 # STEP 2: Setup environment (MANDATORY!)
-./scripts/worktree-setup.bat ../rover-gamepad
+scripts\worktree-setup-secure.bat "C:\Users\wtyle\rover-gamepad" 15
 
 # STEP 3: Navigate and start Claude
 cd ../rover-gamepad
 claude
-
-# STEP 4: In Claude, immediately sync with Taskmaster
-# Tell Claude: "I'm working on Task 15 (Gamepad Control) in the gamepad worktree"
 ```
 
 #### 2. Switching Between Active Worktrees
@@ -123,36 +236,36 @@ Each worktree needs its own:
 - `venv/` (Python virtual environment)
 - `.env` files (Environment variables)
 
-**The setup script handles this automatically:**
+**ALWAYS use the secure setup script:**
 ```bash
-# Windows
-./scripts/worktree-setup.bat ../rover-<name>
+# Windows - Secure setup with task integration
+scripts\worktree-setup-secure.bat "C:\Users\wtyle\rover-<name>" <task-id>
 
 # Unix/Mac
-./scripts/worktree-setup.sh ../rover-<name>
+./scripts/worktree-setup-secure.sh /path/to/rover-<name> <task-id>
 ```
 
-### 🛠️ Essential Worktree Commands
+### 🛠️ Worktree Setup - USE ONLY THESE COMMANDS
 
 ```bash
-# CREATE: New worktree with new branch
-git worktree add ../rover-<name> -b feature/<branch-name>
+# AUTOMATED: Best for new features (integrates with Taskmaster)
+scripts\create-task-worktree.bat
 
-# CREATE: New worktree with existing branch
-git worktree add ../rover-<name> <existing-branch>
+# MANUAL: For specific setup needs
+scripts\worktree-setup-secure.bat "C:\Users\wtyle\rover-<name>" <task-id>
 
-# LIST: Show all worktrees
-git worktree list
+# STATUS: Check all worktrees
+scripts\worktree-status.bat
 
-# REMOVE: Delete worktree (after merging)
-git worktree remove ../rover-<name>
+# CLEANUP: Remove old worktrees
+scripts\cleanup-worktrees.bat
 
-# PRUNE: Clean up deleted worktree references
-git worktree prune
-
-# STATUS: Check worktree details
-cd ../rover-auth && git status
+# ⚠️ NEVER USE: worktree-setup.bat (deprecated, has security issues)
 ```
+
+### Quick Worktree Creation:
+1. **For new task**: `scripts\create-task-worktree.bat` (interactive, integrates with Taskmaster)
+2. **For existing branch**: `git worktree add ../rover-<name> <branch-name>` then run secure setup
 
 ### 📋 Task-Specific Worktree Examples
 
@@ -207,9 +320,12 @@ git worktree add ../rover-feature -b feature/new
 cd ../rover-feature
 claude  # WILL FAIL - No dependencies!
 
-# ✅ CORRECT
+# ✅ CORRECT - Use automated creation
+scripts\create-task-worktree.bat
+
+# ✅ CORRECT - Manual with secure setup
 git worktree add ../rover-feature -b feature/new
-./scripts/worktree-setup.bat ../rover-feature
+scripts\worktree-setup-secure.bat "C:\Users\wtyle\rover-feature" <task-id>
 cd ../rover-feature
 claude
 ```
@@ -249,7 +365,7 @@ git worktree remove <path>
 ```bash
 # Worktree missing dependencies
 cd <worktree-path>
-./scripts/worktree-setup.bat .
+scripts\worktree-setup-secure.bat "." <task-id>
 ```
 
 #### Worktree directory still exists after removal
@@ -279,62 +395,35 @@ cp ../RoverMissionControl/backend/.env backend/
 
 **ALWAYS USE SECURE SETUP**:
 ```bash
-# ✅ SECURE - Use this for production-ready setup
-./scripts/worktree-setup-secure.bat ../rover-<name> <task-id>
+# ✅ AUTOMATED - Best for new features (recommended)
+scripts\create-task-worktree.bat
 
-# ✅ TASK-INTEGRATED - Best for new features
-./scripts/create-task-worktree.bat
+# ✅ MANUAL - For specific setup needs  
+scripts\worktree-setup-secure.bat "C:\Users\wtyle\rover-<name>" <task-id>
 
-# ⚠️ DEPRECATED - Original script has security issues
-# ./scripts/worktree-setup.bat (DO NOT USE)
+# ⚠️ NEVER USE: worktree-setup.bat (deprecated, has security issues)
 ```
 
-### 🚀 Advanced Worktree Patterns
-
-#### Pattern 1: Feature Branch Development
-```bash
-# Main feature branch
-git worktree add ../rover-telemetry -b feature/telemetry
-
-# Sub-feature branches
-git worktree add ../rover-telemetry-ui -b feature/telemetry-ui
-git worktree add ../rover-telemetry-api -b feature/telemetry-api
-
-# Merge sub-features into main feature
-cd ../rover-telemetry
-git merge feature/telemetry-ui
-git merge feature/telemetry-api
-```
-
-#### Pattern 2: A/B Testing Implementations
-```bash
-# Approach A: Socket.IO
-git worktree add ../rover-socketio -b feature/telemetry-socketio
-
-# Approach B: Native WebSockets  
-git worktree add ../rover-websocket -b feature/telemetry-websocket
-
-# Compare and choose best approach
-```
-
-#### Pattern 3: Multi-Version Support
-```bash
-# Current version development
-git worktree add ../rover-v2 -b release/v2.0
-
-# Hotfix for previous version
-git worktree add ../rover-v1-hotfix -b hotfix/v1.5.1
-```
-
-### 📚 Complete Worktree Reference
-Full documentation: `docs/WORKTREE_GUIDE.md`
-Setup scripts: `scripts/worktree-setup.bat` (Windows), `scripts/worktree-setup.sh` (Unix)
-Manager utility: `scripts/worktree-manager.sh`
+**Active Worktrees:** Main, Auth, Telemetry, Hotfix (see `docs/WORKTREE_GUIDE.md` for details)
 
 ## 🚨 MANDATORY TASKMASTER SYNCHRONIZATION 🚨
 
 ### RULE #1: TASKMASTER IS THE SINGLE SOURCE OF TRUTH
 **EVERY SINGLE ACTION** you take on a task MUST be reflected in Taskmaster IMMEDIATELY.
+
+### 🧠 Intelligent Task Confidence Tracking
+
+**Monitor your confidence and knowledge boundaries:**
+```bash
+# When starting any task, assess your knowledge
+mcp__clear-thought__metacognitivemonitoring \
+  --task='[Current Task Description]' \
+  --stage='knowledge-assessment' \
+  --monitoringId='task-[ID]'
+
+# If confidence < 70%, seek clarification or research
+# If confidence > 90%, proceed with implementation
+```
 
 ### CRITICAL WORKFLOW - FOLLOW THIS OR FAIL:
 
@@ -349,6 +438,12 @@ Manager utility: `scripts/worktree-manager.sh`
    ```bash
    # IMMEDIATELY set status to in-progress
    mcp__taskmaster-ai__set_task_status --id=<ID> --status=in-progress
+   
+   # Assess your readiness
+   mcp__clear-thought__metacognitivemonitoring \
+     --task='Starting [task description]' \
+     --stage='planning' \
+     --overallConfidence=0.8
    ```
 
 3. **DURING WORK:**
@@ -357,6 +452,13 @@ Manager utility: `scripts/worktree-manager.sh`
    mcp__taskmaster-ai__update_task --id=<ID> --prompt="<what you've done>"
    # Or for subtasks:
    mcp__taskmaster-ai__update_subtask --id=<ID> --prompt="<progress details>"
+   
+   # Monitor confidence levels
+   mcp__clear-thought__metacognitivemonitoring \
+     --task='[Current implementation]' \
+     --stage='execution' \
+     --iteration=2 \
+     --nextAssessmentNeeded=true
    ```
 
 4. **WHEN COMPLETING WORK:**
@@ -371,10 +473,27 @@ Manager utility: `scripts/worktree-manager.sh`
    mcp__taskmaster-ai__update_task --id=<ID> --prompt="Blocked by: <reason>"
    ```
 
-### YOUR TODO LIST IS SECONDARY
-- Your TodoWrite tool is just a personal reminder
-- It should MIRROR Taskmaster, not replace it
-- If they're out of sync, Taskmaster is correct
+### 📋 TodoWrite vs Taskmaster - Clear Roles
+
+**Taskmaster** (Official Project Tracking):
+- Task and subtask status updates
+- Progress recording for project visibility  
+- Source of truth for what needs doing
+- Required for all project work
+
+**TodoWrite** (Personal Work Organization):
+- Breaking down complex problems
+- Planning implementation approach
+- Tracking micro-steps within a subtask
+- Personal reminders and notes
+
+**Example Workflow**:
+1. Check Taskmaster for assigned work
+2. Use TodoWrite to plan your approach
+3. Update Taskmaster when starting/completing
+4. TodoWrite helps you track progress between Taskmaster updates
+
+Think of it as: Taskmaster = Project Manager, TodoWrite = Personal Notebook
 
 ### SYNCHRONIZATION CHECKLIST:
 Before responding to the user, ask yourself:
@@ -385,6 +504,16 @@ Before responding to the user, ask yourself:
 - [ ] Is my todo list synchronized with Taskmaster?
 
 ### TASKMASTER COMMANDS YOU MUST USE:
+
+### 🎯 Taskmaster Aliases (Mental Shortcuts)
+
+Think of these simplified patterns:
+- **Check**: `get_task` or `next_task`  
+- **Start**: `set_status <id> in-progress`
+- **Update**: `update_task <id> "progress"`
+- **Done**: `set_status <id> done`
+
+**Pro tip**: You only need to remember 4 commands for 90% of workflows!
 
 #### Status Management:
 ```bash
@@ -447,10 +576,85 @@ mcp__taskmaster-ai__get_task --id=27
 ### THE GOLDEN RULE:
 **If you did work but didn't update Taskmaster, you didn't do the work.**
 
+### 🧠 Handling Task Conflicts with Argumentation
+
+**When tasks have conflicting priorities or requirements:**
+```bash
+# Build argument for approach
+mcp__clear-thought__structuredargumentation \
+  --claim='Task X should be prioritized over Task Y' \
+  --argumentType='thesis' \
+  --premises='["X blocks 3 other tasks", "Y can wait for next sprint"]'
+
+# Consider counter-argument
+mcp__clear-thought__structuredargumentation \
+  --claim='Task Y is more critical for user experience' \
+  --argumentType='antithesis' \
+  --respondsTo='[previous-argument-id]'
+
+# Synthesize decision
+mcp__clear-thought__structuredargumentation \
+  --claim='Complete critical path of X, then switch to Y' \
+  --argumentType='synthesis'
+```
+
+## 🤔 When Instructions Conflict
+
+### Priority Hierarchy
+1. **Security & Safety** - Never compromise these
+2. **User's Explicit Request** - Direct instructions override defaults  
+3. **Project-Specific Context** - CLAUDE.md customizations
+4. **General Best Practices** - Standard procedures
+
+### Common Conflicts:
+- **User says "skip tests" but instructions say "always test"**: 
+  - Follow user but warn about risks
+  - Suggest running tests before final commit
+
+- **Urgent fix needs --no-verify but security is critical**:
+  - Use --no-verify if truly urgent
+  - Immediately run security checks after
+  - Document why it was necessary
+
+- **Taskmaster unavailable but work continues**:
+  - Continue work with detailed TodoWrite tracking
+  - Update Taskmaster as soon as available
+  - Inform user about the sync gap
+
 ## Specialized Agents Available
 
 ### When to Use Specialized Agents:
 Delegate to these agents for domain-specific expertise. They have focused context and specialized knowledge. Use the **agent-coordinator** when unsure which specialist to choose.
+
+### 🧠 Intelligent Agent Selection
+
+**Apply mental models to agent selection:**
+```bash
+# Use first principles thinking
+mcp__clear-thought__mentalmodel \
+  --modelName='first_principles' \
+  --problem='Need to implement secure gamepad control' \
+  --steps='["What are the fundamental requirements?", "What agents have these capabilities?"]'
+
+# Apply Pareto Principle (80/20 rule)
+mcp__clear-thought__mentalmodel \
+  --modelName='pareto_principle' \
+  --problem='Multiple agents could help - which provides 80% of value?'
+```
+
+**Test agent effectiveness scientifically:**
+```bash
+# Form hypothesis about agent capabilities
+mcp__clear-thought__scientificmethod \
+  --stage='hypothesis' \
+  --question='Will hardware-integration-specialist handle Arduino serial communication effectively?'
+
+# After using agent, analyze results
+mcp__clear-thought__scientificmethod \
+  --stage='analysis' \
+  --inquiryId='[previous-id]' \
+  --experiment='{"results": "Agent successfully implemented serial protocol"}'
+```
 
 #### Available Agents (12 Total):
 
@@ -495,27 +699,155 @@ Delegate to these agents for domain-specific expertise. They have focused contex
 | Create documentation/compliance | compliance-documentation-specialist |
 
 ### Agent Usage Examples:
+
+#### 🧠 Multi-Agent Coordination with Reasoning
+
+**For complex features requiring multiple agents:**
 ```bash
-# When unsure which agent to use
-Task(description="Agent selection", prompt="/agent-coordinator I need to add secure gamepad control", subagent_type="agent-coordinator")
+# Use collaborative reasoning to plan multi-agent approach
+mcp__clear-thought__collaborativereasoning \
+  --topic='Implementing secure telemetry dashboard with real-time updates' \
+  --personas='[
+    {"id": "ui_expert", "name": "Frontend Specialist", "expertise": ["React", "D3.js"]},
+    {"id": "realtime_expert", "name": "WebSocket Engineer", "expertise": ["Socket.IO", "streaming"]},
+    {"id": "security_expert", "name": "Security Architect", "expertise": ["encryption", "auth"]}
+  ]' \
+  --stage='problem-definition'
+```
 
-# For hardware tasks
-Task(description="Arduino integration", prompt="/hardware-integration-specialist Implement serial communication with Arduino", subagent_type="hardware-integration-specialist")
+#### Real-World Scenarios:
 
-# For security review
-Task(description="Security audit", prompt="/cybersecurity-specialist Review API endpoints for vulnerabilities", subagent_type="cybersecurity-specialist")
+**Scenario 1: Adding Xbox Controller Support**
+```bash
+# First, use mental model to break down requirements
+mcp__clear-thought__mentalmodel \
+  --modelName='first_principles' \
+  --problem='Xbox controller support for rover'
 
-# For multi-agent workflows
-Task(description="Complex feature", prompt="/agent-coordinator Implement secure telemetry with UI dashboard", subagent_type="agent-coordinator")
+# Then coordinate agents
+Task(description="Gamepad implementation", 
+     prompt="/agent-coordinator Add Xbox controller support with haptic feedback for rover control",
+     subagent_type="agent-coordinator")
+# Coordinator will engage: advanced-input-systems-engineer + safety-critical-systems-engineer
+```
+
+**Scenario 2: WebSocket Memory Leak**
+```bash
+# Direct specialist for known domain
+Task(description="Fix WebSocket leak",
+     prompt="/realtime-telemetry-engineer Debug and fix memory leak in WebSocket connection pooling",
+     subagent_type="realtime-telemetry-engineer")
+```
+
+**Scenario 3: Emergency Stop System**
+```bash
+# Safety-critical feature
+Task(description="E-stop implementation",
+     prompt="/safety-critical-systems-engineer Design fail-safe emergency stop with hardware kill switch",
+     subagent_type="safety-critical-systems-engineer")
+```
+
+**Scenario 4: GDPR Compliance**
+```bash
+# Compliance and documentation
+Task(description="GDPR implementation",
+     prompt="/compliance-documentation-specialist Implement GDPR data deletion and audit logging",
+     subagent_type="compliance-documentation-specialist")
+```
+
+**Scenario 5: Complete Feature - Telemetry Dashboard**
+```bash
+# Complex multi-domain feature
+Task(description="Telemetry dashboard",
+     prompt="/agent-coordinator Build real-time telemetry dashboard with D3.js visualizations, WebSocket streaming, and mobile responsiveness",
+     subagent_type="agent-coordinator")
+# Will coordinate: react-ui-engineer + realtime-telemetry-engineer + test-automation-engineer
 ```
 
 ## Project-Specific Instructions
 
-### Authentication System (Task 27)
-- Backend implementation is in `/backend/auth/`
-- Database tables are initialized
-- Only Task 27.4 (Frontend UI) remains
-- Default admin: admin/Admin@123 (CHANGE IN PRODUCTION)
+### Authentication System (Task 27) - Current Status
+
+#### Backend Implementation (COMPLETED)
+- **Location**: `/backend/auth/`
+- **Features Implemented**:
+  - JWT authentication with RS256 algorithm
+  - Role-Based Access Control (RBAC) with permissions
+  - Password hashing with bcrypt
+  - Token refresh mechanism
+  - Session management
+  - Audit logging for auth events
+
+#### Database Schema (COMPLETED)
+- **Tables Created**:
+  - `users`: User accounts with hashed passwords
+  - `roles`: Role definitions (admin, operator, viewer)
+  - `permissions`: Granular permissions
+  - `user_roles`: User-role associations
+  - `user_sessions`: Active session tracking
+  - `auth_audit_log`: Authentication event logging
+
+#### API Endpoints (COMPLETED)
+```python
+# Available auth endpoints:
+POST   /api/v1/auth/login          # User login
+POST   /api/v1/auth/logout         # User logout  
+POST   /api/v1/auth/refresh        # Refresh access token
+GET    /api/v1/auth/me             # Get current user
+POST   /api/v1/auth/change-password # Change password
+GET    /api/v1/users               # List users (admin only)
+POST   /api/v1/users               # Create user (admin only)
+PUT    /api/v1/users/{id}          # Update user (admin only)
+DELETE /api/v1/users/{id}          # Delete user (admin only)
+```
+
+#### Security Features (COMPLETED)
+- Rate limiting on login attempts
+- Account lockout after failed attempts
+- Secure password requirements
+- CORS configuration
+- HTTPS enforcement in production
+- Security headers implementation
+
+#### Frontend Implementation (Task 27.4 - PENDING)
+**Still needs to be implemented**:
+- Login/logout UI components
+- Password change interface
+- User management dashboard (admin)
+- Session timeout handling
+- Token refresh automation
+- Protected route components
+
+#### Environment Configuration
+```bash
+# Required in .env:
+JWT_SECRET=<32+ character secret>  # Generate with: openssl rand -hex 32
+JWT_ALGORITHM=RS256
+JWT_ACCESS_TOKEN_EXPIRE_MINUTES=15
+JWT_REFRESH_TOKEN_EXPIRE_DAYS=7
+BCRYPT_ROUNDS=12
+
+# Default admin account (created on first run):
+# Username and password are in .env file
+# MUST be changed immediately in production
+```
+
+#### Testing the Auth System
+```bash
+# Backend tests exist in:
+backend/tests/test_auth.py
+backend/tests/test_rbac.py
+
+# Run auth tests:
+cd backend
+pytest tests/test_auth.py -v
+```
+
+#### Integration Notes
+- WebSocket connections authenticate via JWT in connection params
+- All API routes except /docs require authentication
+- Frontend should store tokens in httpOnly cookies
+- Implement axios interceptors for token refresh
 
 ### Running Commands
 ```bash
@@ -533,15 +865,206 @@ npm run build-storybook
 cd backend && python server.py
 ```
 
+### Recent Development Context
+
+#### Task 54: Real-time Telemetry (In Progress)
+- **Status**: 5 of 8 subtasks completed
+- **Completed**:
+  - WebSocket infrastructure
+  - Binary protocol for efficiency
+  - Connection pooling
+  - Reconnection logic
+  - Basic telemetry endpoints
+- **Remaining**:
+  - Frontend visualization components
+  - Performance optimization
+  - Stress testing
+
+#### Performance Optimizations (Recently Completed)
+- Frontend build configuration optimized
+- Service Worker with offline support
+- Asset optimization scripts
+- Lazy loading implementation
+- Code splitting configured
+
+#### Current Branch Structure
+- **main**: Stable release branch
+- **feature/performance-optimization-main**: Current active development
+- **feature/authentication**: Auth system implementation
+- **feature/telemetry-improvements**: Real-time data work
+
 ### Critical Paths
 - Backend: `/backend/` (FastAPI server)
 - Frontend: `/frontend/` (React app)
 - Shared: `/shared/` (common code)
 - Database: `/shared/data/rover_platform.db`
+- Scripts: `/scripts/` (automation tools)
+- Tests: `/tests/e2e/` (end-to-end tests)
 
 ---
 
 **REMEMBER: The user's trust depends on you keeping Taskmaster updated. Don't break that trust.**
+
+## 🔐 Security Best Practices
+
+### NEVER Expose Credentials
+- Default credentials should NEVER appear in CLAUDE.md
+- All sensitive information must use environment variables
+- Reference `docs/guides/ENVIRONMENT_VARIABLES.md` for secure configuration
+
+### API Keys and Tokens
+- Store all API keys in `.env` files (NEVER commit these)
+- MCP server tokens should use environment variables:
+  - `ANTHROPIC_API_KEY` for Claude
+  - `GITHUB_TOKEN` for GitHub MCP
+  - See full list in `docs/guides/ENVIRONMENT_VARIABLES.md`
+
+### Git Security
+- Use `--no-verify` ONLY for emergency fixes
+- Always run security checks after emergency commits:
+  ```bash
+  # After using --no-verify, immediately run:
+  pre-commit run --all-files
+  ```
+
+## 🔧 MCP Server Tools - Quick Reference
+
+See `docs/MCP_TOOLS_GUIDE.md` for detailed examples and workflows.
+
+**Key Tools:**
+- **📅 time-server**: Timestamps, timezone conversions
+- **🧠 clear-thought**: Problem-solving, decisions (see `docs/COGNITIVE_TOOLS.md`)
+- **🔍 perplexity-ask**: Research, best practices, security
+- **💾 memory**: Knowledge graph, relationships
+- **🖥️ desktop-commander**: File operations, search
+- **📚 context7**: Library documentation
+- **🐙 github**: Repository operations
+- **🎯 taskmaster-ai**: Task management
+
+### Practical Workflow Examples
+
+**Example 1: Implementing a New Feature**
+```bash
+# 1. Research best approach
+mcp__perplexity-ask__perplexity_ask --messages='[{"role": "user", "content": "Best practices for implementing JWT refresh tokens in FastAPI"}]'
+
+# 2. Use clear-thought for planning
+mcp__clear-thought__sequentialthinking --thought="Planning JWT refresh token implementation"
+
+# 3. Get documentation
+mcp__context7__get-library-docs --context7CompatibleLibraryID="/tiangolo/fastapi" --topic="JWT authentication"
+
+# 4. Track in knowledge graph
+mcp__memory__create_entities --entities='[{"name": "JWTRefreshToken", "entityType": "Feature", "observations": ["Implements token rotation", "15-minute access token lifetime"]}]'
+```
+
+**Example 2: Debugging Production Issue**
+```bash
+# 1. Analyze the problem
+mcp__clear-thought__debuggingapproach --approachName="root_cause_analysis" --issue="WebSocket connections dropping after 5 minutes"
+
+# 2. Search codebase for timeout settings
+mcp__desktop-commander__search_code --path="C:/project" --pattern="timeout.*300|5.*min" --ignoreCase=true
+
+# 3. Research known issues
+mcp__perplexity-ask__perplexity_ask --messages='[{"role": "user", "content": "Socket.IO connection timeout issues nginx proxy"}]'
+
+# 4. Document the fix
+mcp__memory__add_observations --observations='[{"entityName": "WebSocketManager", "contents": ["Fixed nginx proxy timeout from 300s to 3600s"]}]'
+```
+
+## 📊 Monitoring & Debugging
+
+### System Health Checks
+```bash
+# Check all worktrees status
+scripts\worktree-status.bat
+
+# Verify MCP servers are responding  
+mcp__github__list_repositories --query="user:me" --per_page=1
+mcp__taskmaster-ai__get_tasks --status=all
+
+# Check for dependency issues
+cd frontend && npm ls
+cd ../backend && pip check
+```
+
+### When MCP Servers Fail
+1. **First**: Check if it's a token/auth issue
+2. **Fallback**: Use manual commands/direct file access
+3. **Document**: What failed and workaround used
+4. **Retry**: Periodically check if service restored
+
+### Debug Information Gathering
+When reporting issues, gather:
+- Error message (exact)
+- Context (what you were doing)
+- Environment (worktree, branch, directory)
+- Recent commands (last 5-10)
+
+---
+
+## 📈 Cognitive Tools Success Metrics
+
+### Tracking Effectiveness
+
+**Monitor improvement in key areas:**
+
+1. **Problem Resolution Metrics**
+   - Time to resolve issues (target: 50% reduction)
+   - First-attempt success rate (target: >70%)
+   - Issues requiring escalation (target: <20%)
+
+2. **Decision Quality Metrics**
+   - Decisions reverted/changed (target: <10%)
+   - Time spent in analysis paralysis (target: <15min)
+   - Stakeholder satisfaction with choices
+
+3. **Implementation Confidence**
+   - Average confidence level (target: >80%)
+   - Knowledge gap identification rate
+   - Research effectiveness score
+
+4. **Cognitive Tool Usage**
+   ```bash
+   # Track which tools provide most value
+   mcp__memory__create_entities --entities='[{
+     "name": "CognitiveToolMetrics",
+     "entityType": "Analytics",
+     "observations": [
+       "debuggingapproach reduced issue resolution time by 60%",
+       "decisionframework prevented 3 architectural reversals",
+       "metacognitivemonitoring identified knowledge gaps early"
+     ]
+   }]'
+   ```
+
+### Weekly Review Process
+
+**Every Friday, assess cognitive enhancement:**
+```bash
+# Review the week's problem-solving
+mcp__clear-thought__metacognitivemonitoring \
+  --task='Weekly cognitive tool effectiveness review' \
+  --stage='evaluation' \
+  --overallConfidence=0.85
+
+# Document learnings
+mcp__memory__add_observations \
+  --observations='[{
+    "entityName": "WeeklyReview",
+    "contents": ["Sequentialthinking most effective for complex features"]
+  }]'
+```
+
+### Continuous Improvement
+
+1. **Identify Patterns**: Which tools help most with which problems?
+2. **Adjust Triggers**: Refine when tools are automatically invoked
+3. **Share Learnings**: Update this document with discoveries
+4. **Measure Impact**: Track velocity and quality improvements
+
+Remember: The goal is augmented intelligence, not replacement. These tools should make you faster and more reliable, not slower and more bureaucratic.
 
 ## Using Gemini CLI for Large Codebase Analysis
 
